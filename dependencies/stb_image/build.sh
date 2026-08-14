@@ -77,9 +77,14 @@ build() {
   # 生成独立编译单元（定义 STB_IMAGE_IMPLEMENTATION）
   printf '#define STB_IMAGE_IMPLEMENTATION\n#include "stb_image.h"\n' > "${bd}/stb_image.c"
 
+  # 组装编译器参数（含可选的交叉编译 isysroot）
+  local cflags=(-O2 -fPIC -I"${src}")
+  if [ -n "${EXTRA_CFLAGS:-}" ]; then cflags+=($EXTRA_CFLAGS); fi
+  if [ -n "${SYSROOT:-}" ]; then cflags+=("-isysroot" "${SYSROOT}"); fi
+
   echo "[${DEP_NAME}] 编译 stb_image.c"
   # shellcheck disable=SC2086
-  ${cc} ${EXTRA_CFLAGS:-} -O2 -fPIC -I"${src}" -c "${bd}/stb_image.c" -o "${bd}/stb_image.o"
+  "${cc}" "${cflags[@]}" -c "${bd}/stb_image.c" -o "${bd}/stb_image.o"
 
   echo "[${DEP_NAME}] 归档 libstb_image.a"
   # shellcheck disable=SC2086

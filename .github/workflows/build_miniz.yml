@@ -104,7 +104,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build
         run: |
-          export CC="$(xcrun --sdk macosx --find clang)"
+          export CC="$(xcrun --sdk macosx --find clang)"; export SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
           bash dependencies/miniz/build.sh
       - name: Package
         run: |
@@ -166,7 +166,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build
         run: |
-          export CC="$(xcrun --sdk iphoneos --find clang)"
+          export CC="$(xcrun --sdk iphoneos --find clang)"; export SYSROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
           bash dependencies/miniz/build.sh
       - name: Package
         run: |

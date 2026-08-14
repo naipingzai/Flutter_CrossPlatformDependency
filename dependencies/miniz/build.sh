@@ -91,11 +91,15 @@ build() {
   rm -rf "$bd"; mkdir -p "$bd"
 
   local objs=()
+  # 组装编译器参数（含可选的交叉编译 isysroot）
+  local cflags=(-O2 -fPIC -I"${src}")
+  if [ -n "${EXTRA_CFLAGS:-}" ]; then cflags+=($EXTRA_CFLAGS); fi
+  if [ -n "${SYSROOT:-}" ]; then cflags+=("-isysroot" "${SYSROOT}"); fi
   for s in $DEP_SOURCES; do
     local o="${bd}/${s%.c}.o"
     echo "[${DEP_NAME}] 编译 ${s} -> ${o}"
     # shellcheck disable=SC2086
-    ${cc} ${EXTRA_CFLAGS:-} -O2 -fPIC -I"${src}" -c "${src}/${s}" -o "${o}"
+    "${cc}" "${cflags[@]}" -c "${src}/${s}" -o "${o}"
     objs+=("$o")
   done
 
