@@ -1,0 +1,48 @@
+# ============================================================
+# FFmpeg 第三方依赖配置
+# ============================================================
+# 本仓库只负责获取源码、跨平台编译静态库并发布产物。
+# 消费方（APP）只下载编译好的 include/ 与 lib/，不参与编译过程。
+#
+# 输出统一结构：
+#   include/          头文件（所有平台一致）
+#   lib/<plat>/<arch>/静态库（平台相关）
+# ============================================================
+
+name: ffmpeg
+version: "n7.1"
+
+source:
+  url: https://ffmpeg.org/releases/ffmpeg-7.1.tar.xz
+  # 可选：n7.1 发布 tar.xz 的 SHA-256（留空则不做校验）
+  sha256: ""
+
+build:
+  type: static              # 只输出静态库（.a / .lib）
+  # FFmpeg 使用自带的 ./configure + make，不适用 CMake。
+  # 配置细节见 scripts/build_*.sh
+  configure: "./configure"
+  output:
+    include: include/
+    lib: lib/
+
+platforms:
+  windows:
+    enabled: true
+    arch: [x86_64]
+    # 使用 msys2/mingw-w64 交叉编译，生成 x86_64 静态库
+  linux:
+    enabled: true
+    arch: [x86_64, aarch64]
+  macos:
+    enabled: true
+    arch: [arm64, x86_64]
+    # 两架构分别编译后 lipo 合并为 universal 静态库
+  android:
+    enabled: true
+    abi: [armeabi-v7a, arm64-v8a, x86, x86_64]
+    min_sdk: 21
+  ios:
+    enabled: true
+    arch: [arm64]
+    # 真机 arm64 静态库（设备）

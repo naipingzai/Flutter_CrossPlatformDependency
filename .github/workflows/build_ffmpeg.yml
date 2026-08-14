@@ -1,0 +1,173 @@
+# ============================================================
+# build_ffmpeg.yml
+# ============================================================
+# 编译 FFmpeg n7.1 各平台静态库并发布到 GitHub Release。
+#
+# 触发：
+#   - 手动 workflow_dispatch
+#   - push tag（ffmpeg-*）
+#
+# 每个平台 Job 产出：
+#   ffmpeg/<plat>/<arch>/{include,lib}
+# 并打包为 zip 上传（workflow artifact）。
+# release Job 汇总所有平台产物，创建/更新 GitHub Release。
+# ============================================================
+
+name: Build FFmpeg Static Libs
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'ffmpeg-*'
+
+permissions:
+  contents: write
+
+env:
+  FFMPEG_VERSION: "7.1"
+  RELEASE_TAG: "ffmpeg-n7.1"
+
+jobs:
+  # ============================================================
+  # Linux: x86_64 + aarch64
+  # ============================================================
+  linux:
+    name: Linux (x86_64 + aarch64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build FFmpeg (Linux)
+        run: bash dependencies/ffmpeg/scripts/build_linux.sh
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-linux
+          path: ${{ runner.temp }}/ffmpeg-stage/ffmpeg/linux
+          if-no-files-found: error
+
+  # ============================================================
+  # Windows: x86_64 (MSYS2/MinGW64)
+  # ============================================================
+  windows:
+    name: Windows (x86_64)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git make mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm mingw-w64-x86_64-pkgconf
+      - name: Build FFmpeg (Windows)
+        run: bash dependencies/ffmpeg/scripts/build_windows.sh
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-windows
+          path: ${{ runner.temp }}/ffmpeg-stage/ffmpeg/windows
+          if-no-files-found: error
+
+  # ============================================================
+  # macOS: universal (arm64 + x86_64)
+  # ============================================================
+  macos:
+    name: macOS (universal)
+    runs-on: macos-14
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build FFmpeg (macOS)
+        run: bash dependencies/ffmpeg/scripts/build_macos.sh
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-macos
+          path: ${{ runner.temp }}/ffmpeg-stage/ffmpeg/macos
+          if-no-files-found: error
+
+  # ============================================================
+  # Android: armeabi-v7a / arm64-v8a / x86 / x86_64
+  # ============================================================
+  android:
+    name: Android (4 ABIs)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup_ndk
+        with:
+          ndk-version: r27c
+          add-to-path: false
+      - name: Build FFmpeg (Android)
+        env:
+          NDK_ROOT: ${{ steps.setup_ndk.outputs.ndk-path }}
+        run: bash dependencies/ffmpeg/scripts/build_android.sh
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-android
+          path: ${{ runner.temp }}/ffmpeg-stage/ffmpeg/android
+          if-no-files-found: error
+
+  # ============================================================
+  # iOS: arm64 真机
+  # ============================================================
+  ios:
+    name: iOS (arm64)
+    runs-on: macos-14
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build FFmpeg (iOS)
+        run: bash dependencies/ffmpeg/scripts/build_ios.sh
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-ios
+          path: ${{ runner.temp }}/ffmpeg-stage/ffmpeg/ios
+          if-no-files-found: error
+
+  # ============================================================
+  # Release: 汇总所有平台产物，创建/更新 GitHub Release
+  # ============================================================
+  release:
+    name: Publish Release
+    runs-on: ubuntu-24.04
+    needs: [linux, windows, macos, android, ios]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Show collected assets
+        run: |
+          find release-assets -maxdepth 4 -type d | sort
+          du -sh release-assets
+      - name: Create/Update Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          # 存在则删除旧 tag/release 以覆盖更新
+          gh release delete "${RELEASE_TAG}" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "${RELEASE_TAG}" \
+            --title "FFmpeg ${RELEASE_TAG}" \
+            --notes "FFmpeg n7.1 跨平台静态库" \
+            release-assets/**/* 2>/dev/null || \
+          gh release create "${RELEASE_TAG}" \
+            --title "FFmpeg ${RELEASE_TAG}" \
+            --notes "FFmpeg n7.1 跨平台静态库" \
+            $(find release-assets -type f)
+          echo "Release 创建完成: ${RELEASE_TAG}"
