@@ -26,15 +26,11 @@ Flutter_CrossPlatformDependency/
 │       ├── build.sh                  # 自包含构建脚本（内含标注的编译规则）
 │       └── dependency.yaml           # 依赖配置（版本 / 平台 / 产物结构）
 │
-├── toolchains/                       # （可选）CMake 型依赖的跨编译工具链
-│   ├── android.cmake
-│   └── ios.cmake
-│
 └── .github/workflows/
     └── build_<dep>.yml               # 该库的平台矩阵 + 发布 Release（每个库一份）
 ```
 
-> 库之间没有共享脚本，`toolchains/` 仅是 CMake 型依赖的独立参考文件。
+> 库之间没有共享脚本。若某库是 CMake 型依赖，其工具链配置放在**该库自己的目录**内，不放在顶层。
 
 ---
 
