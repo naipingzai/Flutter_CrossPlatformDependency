@@ -113,6 +113,15 @@ build() {
 ac_cv_file__dev_ptmx=yes
 ac_cv_file__dev_ptc=no
 EOF
+    # Android(bionic) 缺失部分 POSIX 组/影子密码 API，禁用对应 stdlib 模块
+    if [ "$PLATFORM" = "android" ]; then
+      cat >> "$site" <<'EOF'
+ac_cv_func_getgrgid=no
+ac_cv_func_getgrgid_r=no
+ac_cv_func_getspnam=no
+ac_cv_func_getspnam_r=no
+EOF
+    fi
     export CONFIG_SITE="$site"
     if [ -n "${BUILD_PYTHON:-}" ]; then
       cfg+=(--with-build-python="${BUILD_PYTHON}")
