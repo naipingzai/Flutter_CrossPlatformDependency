@@ -17,8 +17,9 @@ name: ffmpeg
 version: "n7.1"
 
 source:
-  url: https://ffmpeg.org/releases/ffmpeg-7.1.tar.xz
-  # 可选：n7.1 发布 tar.xz 的 SHA-256（留空则不做校验）
+  # 优先 GitHub 镜像（比 ffmpeg.org 稳定）
+  url: https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n7.1.tar.gz
+  # 可选：SHA-256（留空则不校验）
   sha256: ""
 
 build:

@@ -17,9 +17,10 @@ set -euo pipefail
 # ============================================================
 DEP_NAME="ffmpeg"
 DEP_VERSION="7.1"
-DEP_TARBALL="ffmpeg-${DEP_VERSION}.tar.xz"
-DEP_URL="https://ffmpeg.org/releases/${DEP_TARBALL}"
-DEP_SRC_DIR="ffmpeg-${DEP_VERSION}"
+# 优先使用 GitHub 镜像（比 ffmpeg.org 更稳定，避免 CI 下载被重置）
+DEP_TARBALL="ffmpeg-${DEP_VERSION}.tar.gz"
+DEP_URL="https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n7.1.tar.gz"
+DEP_SRC_DIR="FFmpeg-n7.1"
 
 # 源码 / 产物暂存目录（默认在 runner temp，可被 workflow 覆盖）
 DEP_SOURCE_ROOT="${DEP_SOURCE_ROOT:-${RUNNER_TEMP:-/tmp}/${DEP_NAME}-src}"
@@ -72,9 +73,10 @@ fetch_source() {
   fi
   echo "[${DEP_NAME}] 下载 ${DEP_URL}"
   if command -v curl >/dev/null 2>&1; then
-    curl -fL --retry 3 --retry-delay 3 -o "${DEP_SOURCE_ROOT}/${DEP_TARBALL}" "${DEP_URL}"
+    curl -fL --retry 5 --retry-delay 3 --retry-all-errors \
+         --connect-timeout 20 -o "${DEP_SOURCE_ROOT}/${DEP_TARBALL}" "${DEP_URL}"
   else
-    wget -O "${DEP_SOURCE_ROOT}/${DEP_TARBALL}" "${DEP_URL}"
+    wget --tries=5 -O "${DEP_SOURCE_ROOT}/${DEP_TARBALL}" "${DEP_URL}"
   fi
   # Windows(MSYS) 下把 Windows 路径转成 unix 路径给 tar 用
   local t p
