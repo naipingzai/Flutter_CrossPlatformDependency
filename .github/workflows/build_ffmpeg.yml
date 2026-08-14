@@ -95,48 +95,25 @@ jobs:
           if-no-files-found: error
 
   # ============================================================
-  # macOS: universal（arm64 + x86_64，lipo 合并）
+  # macOS: arm64（Apple Silicon）
+  # 说明：在 arm64 runner 上交叉编 x86_64 会触发 FFmpeg x86 内联
+  # 汇编与 clang 的约束问题，且现代 Mac 均为 Apple Silicon，故只出 arm64。
   # ============================================================
   macos:
-    name: macOS universal
+    name: macOS arm64
     runs-on: macos-14
     timeout-minutes: 180
     env:
       PLATFORM: macos
+      ARCH: arm64
+      ARCH_DIR: arm64
     steps:
       - uses: actions/checkout@v4
-      - name: Install deps (nasm for x86_64)
-        run: brew install nasm
-      - name: Build arm64
-        env:
-          ARCH: arm64
-          ARCH_DIR: arm64
+      - name: Build
         run: |
           export CC="$(xcrun --sdk macosx --find clang)"
           export SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
           bash dependencies/ffmpeg/build.sh
-      - name: Build x86_64
-        env:
-          ARCH: x86_64
-          ARCH_DIR: x86_64
-        run: |
-          export CC="$(xcrun --sdk macosx --find clang)"
-          export SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
-          # 在 arm64 runner 上交叉编 x86_64，必须用 -arch 强制 clang 目标为 x86_64，
-          # 否则 configure 误判为 32 位 x86（导致内联汇编约束错误）
-          export EXTRA_CFLAGS="-arch x86_64"
-          export EXTRA_LDFLAGS="-arch x86_64"
-          bash dependencies/ffmpeg/build.sh
-      - name: Merge universal (lipo)
-        run: |
-          SRC="${RUNNER_TEMP}/ffmpeg-stage/ffmpeg/macos"
-          OUT="${SRC}/universal"
-          mkdir -p "${OUT}/lib"
-          for lib in "${SRC}"/arm64/lib/libav*.a; do
-            base="$(basename "${lib}")"
-            lipo -create "${SRC}/arm64/lib/${base}" "${SRC}/x86_64/lib/${base}" -output "${OUT}/lib/${base}"
-          done
-          cp -a "${SRC}/arm64/include" "${OUT}/include"
       - name: Package
         run: |
           cd "${RUNNER_TEMP}/ffmpeg-stage/ffmpeg"

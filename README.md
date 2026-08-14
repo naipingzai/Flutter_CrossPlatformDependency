@@ -21,7 +21,7 @@
 # == 支持的平台（64 位） ==
 #   Windows  x86_64
 #   Linux    x86_64
-#   macOS    universal (arm64 + x86_64)
+#   macOS    arm64（Apple Silicon）
 #   Android  arm64-v8a
 #   iOS      arm64（真机）
 #

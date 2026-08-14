@@ -37,8 +37,8 @@ platforms:
     arch: [x86_64]
   macos:
     enabled: true
-    arch: [arm64, x86_64]
-    # 两架构分别编译后 lipo 合并为 universal 静态库
+    arch: [arm64]
+    # 仅 Apple Silicon（arm64）；arm64 runner 上交叉编 x86_64 有 FFmpeg 汇编问题
   android:
     enabled: true
     abi: [arm64-v8a]
