@@ -23,14 +23,19 @@ APP 仓库（如 `Flutter_FileManager`）**不维护第三方库的跨平台编�
 Flutter_CrossPlatformDependency/
 ├── dependencies/
 │   └── <dep>/                        # 每个第三方库一个独立目录（见 §3 规范）
-│       ├── build.sh                  # 自包含构建脚本（内含标注的编译规则）
+│       ├── build.sh                  # 通用 autoconf 构建脚本（内含标注的编译规则）
+│       ├── build_<plat>.sh           # 平台专用构建脚本（仅当该平台工具链特殊时才需要）
+│       ├── README.md                 # （可选）该依赖的构建说明
 │       └── dependency.yaml           # 依赖配置（版本 / 平台 / 产物结构）
 │
 └── .github/workflows/
     └── build_<dep>.yml               # 该库的平台矩阵 + 发布 Release（每个库一份）
 ```
 
-> 库之间没有共享脚本。若某库是 CMake 型依赖，其工具链配置放在**该库自己的目录**内，不放在顶层。
+> - 库之间没有共享脚本，完全独立。
+> - 大多数库只需一个通用 `build.sh`（autoconf，规则 A–E）。若某平台工具链特殊
+>   （如 CPython 的 Windows/iOS），才在该依赖目录下另加 `build_<plat>.sh`，并让
+>   workflow 对应 Job 调用它（参考 `dependencies/python/`）。
 
 ---
 
@@ -69,6 +74,10 @@ DEP_CONFIGURE_FLAGS="<--xxx --yyy ...>"             # 本库自身的 configure 
 ```
 
 > 若新库的 configure/构建方式差异较大，只需在「规则 D」内调整，不影响其他库。
+>
+> **平台工具链特殊的库**：若某平台无法用通用 autoconf 构建（如 CPython 的
+> Windows/iOS），在该依赖目录下另加 `build_<plat>.sh`，workflow 对应 Job 调用它。
+> 参见 `dependencies/python/`（`build_windows.sh` / `build_ios.sh`）与其 README。
 
 ### 步骤 3：改写 `dependencies/<dep>/dependency.yaml`
 
@@ -181,14 +190,11 @@ https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/
 > **Python 特别说明**：产物为**可嵌入解释器**，结构为
 > `python/<plat>/<arch>/{include,lib}`，其中 `lib/` 内含
 > `libpython3.x.a`（静态解释器）与 `python3.x/`（标准库）。
-> Linux / macOS 为原生构建（已在本机验证可嵌入：C 程序静态链接
-> `libpython3.12.a` 并成功运行 Python）。
-> Android 为交叉编译（`--host` + `--with-build-python` + `CONFIG_SITE`）。
-> **Windows**：CPython 官方用 MSVC/PCbuild（非 autoconf），本仓库改用
-> 官方 **Windows embeddable 包** + 源码头文件 + 生成的导入库
-> （`build_windows.sh`），产出 `python312.dll` + `libpython312.a` + 标准库。
-> **iOS**：用官方认可的 `pybee/Python-Apple-support`（`build_ios.sh`），
-> 产物含 `Python.xcframework` 供 APP 链接。
+> 各平台构建方式不同，详见 **`dependencies/python/README.md`**：
+> - Linux / macOS / Android：autoconf 静态 `libpython3.12.a`
+> - Windows：官方 **embeddable 包** + 导入库（`build_windows.sh`）
+> - iOS：`pybee/Python-Apple-support`（`build_ios.sh`，产出 `Python.xcframework`）
+> Linux 原生已在本机验证可嵌入（C 程序静态链接 `libpython3.12.a` 成功运行 Python）。
 
 ## 9. 触发 CI 与推送流程
 
