@@ -7,10 +7,13 @@
 #   - 手动 workflow_dispatch
 #   - push tag（ffmpeg-*）
 #
-# 每个平台 Job 产出：
-#   ffmpeg/<plat>/<arch>/{include,lib}
-# 并打包为 zip 上传（workflow artifact）。
-# release Job 汇总所有平台产物，创建/更新 GitHub Release。
+# 每个平台 Job 产出：ffmpeg/<plat>/<arch>/{include,lib}，
+# 打包为 ffmpeg-<plat>.tar.gz 上传（workflow artifact）。
+# release Job 汇总所有平台 tarball 并上传到 GitHub Release
+# （tag: ffmpeg-n7.1）。
+#
+# APP 端消费：
+#   https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/ffmpeg-n7.1/ffmpeg-<plat>.tar.gz
 # ============================================================
 
 name: Build FFmpeg Static Libs
@@ -25,7 +28,6 @@ permissions:
   contents: write
 
 env:
-  FFMPEG_VERSION: "7.1"
   RELEASE_TAG: "ffmpeg-n7.1"
 
 jobs:
@@ -40,11 +42,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build FFmpeg (Linux)
         run: bash dependencies/ffmpeg/scripts/build_linux.sh
-      - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
+      - name: Package
+        run: |
+          cd "${RUNNER_TEMP}/ffmpeg-stage/ffmpeg"
+          tar -czf "${RUNNER_TEMP}/ffmpeg-linux.tar.gz" linux
+      - uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-linux
-          path: ${{ runner.temp }}/ffmpeg-stage/ffmpeg/linux
+          path: ${{ runner.temp }}/ffmpeg-linux.tar.gz
           if-no-files-found: error
 
   # ============================================================
@@ -67,11 +72,14 @@ jobs:
             git make mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm mingw-w64-x86_64-pkgconf
       - name: Build FFmpeg (Windows)
         run: bash dependencies/ffmpeg/scripts/build_windows.sh
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+      - name: Package
+        run: |
+          cd "${RUNNER_TEMP}/ffmpeg-stage/ffmpeg"
+          tar -czf "${RUNNER_TEMP}/ffmpeg-windows.tar.gz" windows
+      - uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-windows
-          path: ${{ runner.temp }}/ffmpeg-stage/ffmpeg/windows
+          path: ${{ runner.temp }}/ffmpeg-windows.tar.gz
           if-no-files-found: error
 
   # ============================================================
@@ -85,11 +93,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build FFmpeg (macOS)
         run: bash dependencies/ffmpeg/scripts/build_macos.sh
-      - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
+      - name: Package
+        run: |
+          cd "${RUNNER_TEMP}/ffmpeg-stage/ffmpeg"
+          tar -czf "${RUNNER_TEMP}/ffmpeg-macos.tar.gz" macos
+      - uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-macos
-          path: ${{ runner.temp }}/ffmpeg-stage/ffmpeg/macos
+          path: ${{ runner.temp }}/ffmpeg-macos.tar.gz
           if-no-files-found: error
 
   # ============================================================
@@ -111,11 +122,14 @@ jobs:
         env:
           NDK_ROOT: ${{ steps.setup_ndk.outputs.ndk-path }}
         run: bash dependencies/ffmpeg/scripts/build_android.sh
-      - name: Upload Android artifact
-        uses: actions/upload-artifact@v4
+      - name: Package
+        run: |
+          cd "${RUNNER_TEMP}/ffmpeg-stage/ffmpeg"
+          tar -czf "${RUNNER_TEMP}/ffmpeg-android.tar.gz" android
+      - uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-android
-          path: ${{ runner.temp }}/ffmpeg-stage/ffmpeg/android
+          path: ${{ runner.temp }}/ffmpeg-android.tar.gz
           if-no-files-found: error
 
   # ============================================================
@@ -129,15 +143,18 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build FFmpeg (iOS)
         run: bash dependencies/ffmpeg/scripts/build_ios.sh
-      - name: Upload iOS artifact
-        uses: actions/upload-artifact@v4
+      - name: Package
+        run: |
+          cd "${RUNNER_TEMP}/ffmpeg-stage/ffmpeg"
+          tar -czf "${RUNNER_TEMP}/ffmpeg-ios.tar.gz" ios
+      - uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-ios
-          path: ${{ runner.temp }}/ffmpeg-stage/ffmpeg/ios
+          path: ${{ runner.temp }}/ffmpeg-ios.tar.gz
           if-no-files-found: error
 
   # ============================================================
-  # Release: 汇总所有平台产物，创建/更新 GitHub Release
+  # Release: 汇总各平台 tarball 并创建/更新 GitHub Release
   # ============================================================
   release:
     name: Publish Release
@@ -151,23 +168,16 @@ jobs:
         with:
           path: release-assets
           merge-multiple: true
-      - name: Show collected assets
-        run: |
-          find release-assets -maxdepth 4 -type d | sort
-          du -sh release-assets
+      - name: List assets
+        run: ls -lh release-assets/
       - name: Create/Update Release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
         run: |
-          # 存在则删除旧 tag/release 以覆盖更新
           gh release delete "${RELEASE_TAG}" --yes --cleanup-tag 2>/dev/null || true
           gh release create "${RELEASE_TAG}" \
             --title "FFmpeg ${RELEASE_TAG}" \
-            --notes "FFmpeg n7.1 跨平台静态库" \
-            release-assets/**/* 2>/dev/null || \
-          gh release create "${RELEASE_TAG}" \
-            --title "FFmpeg ${RELEASE_TAG}" \
-            --notes "FFmpeg n7.1 跨平台静态库" \
-            $(find release-assets -type f)
+            --notes "FFmpeg n7.1 跨平台静态库（include + lib/<plat>/<arch>）" \
+            $(find release-assets -type f -name '*.tar.gz')
           echo "Release 创建完成: ${RELEASE_TAG}"
