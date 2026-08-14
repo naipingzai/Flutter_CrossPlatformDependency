@@ -108,7 +108,10 @@ platforms:
 
 各平台 Job 的**环境变量注入规则**（照抄即用，见下方 §4）。
 
-### 步骤 5：在 `README.md` §8 登记新库，并触发验证
+### 步骤 5：登记并触发验证
+
+- 在 `README.md` §8 登记新库。
+- 按 §9 推送 tag（或手动触发）跑通 CI，并验证 Release 产物。
 
 ---
 
@@ -183,7 +186,58 @@ https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/
 > Android / iOS / Windows(MinGW) 为交叉编译，需要 `--host` 三元组与
 > 同版本的 `BUILD_PYTHON`（主机 python），属于进阶能力，可能需按 CI 结果迭代。
 
-## 9. 触发构建
+## 9. 触发 CI 与推送流程
 
-- **手动**：Actions → 对应 workflow → **Run workflow**。
-- **tag 推送**：推送形如 `<dep>-*` 的 tag（如 `ffmpeg-n7.1`）自动触发对应 workflow。
+> 每个库的 workflow 通过推送形如 `<dep>-*` 的 **tag** 自动触发（也支持手动）。
+
+### 9.1 tag 命名规范
+
+| 依赖 | 产物 tag |
+|------|----------|
+| FFmpeg | `ffmpeg-n7.1` |
+| Python | `python-3.12.7` |
+
+### 9.2 首次触发（打 tag 并推送）
+
+```bash
+# 在仓库根目录
+git tag <dep>-<version>          # 例：git tag python-3.12.7
+git push origin <dep>-<version>  # 例：git push origin python-3.12.7
+```
+
+推送后，对应 `.github/workflows/build_<dep>.yml` 自动运行：
+5 个平台 Job（linux/windows/macos/android/ios）→ `release` Job 汇总并发布到
+该 tag 的 GitHub Release（产物为 `<dep>-<plat>.tar.gz`）。
+
+### 9.3 修改后重新构建（删除并重建 tag）
+
+若改了代码想重跑，删除旧 tag 再打新 tag 推送即可（release 会被覆盖更新）：
+
+```bash
+git push origin :refs/tags/<dep>-<version>   # 删除远端 tag
+git tag -d <dep>-<version>                    # 删除本地 tag
+git tag <dep>-<version>                       # 重新打 tag（指向最新 commit）
+git push origin <dep>-<version>               # 触发 CI
+```
+
+> 注意：`git tag` 会固定在某次 commit。每次改动后都要重新打 tag 到最新 commit，
+> 否则 CI 用的还是旧代码。
+
+### 9.4 手动触发
+
+Actions → 选择 `Build <Dep> Static Libs` → **Run workflow**。
+
+### 9.5 查看结果与产物
+
+1. **进度**：仓库 `Actions` 页查看各平台 Job 是否通过。
+2. **Release**：构建全部通过后，`release` Job 把产物发布到对应 tag 的 Release
+   （`Releases` → `<dep>-<version>`）。
+3. **产物结构**：每个 `<dep>-<plat>.tar.gz` 解压后为 `<dep>/<plat>/<arch>/{include,lib}`。
+
+### 9.6 消费 Release
+
+APP 端按下述 URL 下载对应平台产物（见 §7）：
+
+```text
+https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/<dep>-<version>/<dep>-<plat>.tar.gz
+```
