@@ -40,6 +40,10 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nasm yasm make gcc g++ xz-utils curl
       - name: Build FFmpeg (Linux)
         run: bash dependencies/ffmpeg/scripts/build_linux.sh
       - name: Package

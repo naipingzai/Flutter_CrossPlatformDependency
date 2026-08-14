@@ -54,6 +54,11 @@ build_abi() {
 
   local extra_cflags=(-DANDROID -fPIC ${CFLAGS_EXTRA[$abi]})
   local extra_ldflags="-L${TOOLCHAIN}/sysroot/usr/lib/${triple}/${API_LEVEL}"
+  # x86/x86_64 需要 nasm 才能编手写汇编；NDK 不带 nasm，关闭以产出有效库
+  local arch_opts=()
+  if [ "$arch" = "i686" ] || [ "$arch" = "x86_64" ]; then
+    arch_opts+=(--disable-x86asm)
+  fi
 
   "${FFMPEG_SOURCE_ROOT}/${FFMPEG_SRC_DIR}/configure" \
     $(ffmpeg_common_config) \
@@ -64,7 +69,8 @@ build_abi() {
     --cxx="${cxx}" \
     --extra-cflags="${extra_cflags[*]}" \
     --extra-ldflags="${extra_ldflags}" \
-    --sysroot="${TOOLCHAIN}/sysroot"
+    --sysroot="${TOOLCHAIN}/sysroot" \
+    "${arch_opts[@]}"
 
   make $(ffmpeg_make_flags)
   make install
