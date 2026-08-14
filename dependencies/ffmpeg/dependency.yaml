@@ -33,15 +33,14 @@ platforms:
     # 使用 msys2/mingw-w64 交叉编译，生成 x86_64 静态库
   linux:
     enabled: true
-    arch: [x86_64, aarch64]
+    arch: [x86_64]
   macos:
     enabled: true
     arch: [arm64, x86_64]
     # 两架构分别编译后 lipo 合并为 universal 静态库
   android:
     enabled: true
-    abi: [armeabi-v7a, arm64-v8a, x86_64]
-    # 排除 32 位 x86（i686 内联汇编寄存器不足，难以修复）；主流为 arm64/armv7
+    abi: [arm64-v8a]
     min_sdk: 21
   ios:
     enabled: true

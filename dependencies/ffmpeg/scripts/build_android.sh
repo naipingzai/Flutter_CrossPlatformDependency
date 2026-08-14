@@ -19,17 +19,12 @@ NDK_ROOT="${NDK_ROOT:?需要设置 ANDROID_NDK_ROOT / NDK_ROOT 环境变量}"
 TOOLCHAIN="${NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64"
 API_LEVEL="${MIN_SDK}"
 
-# 各 ABI 的工具链前缀（x86/32位被排除：其 i686 内联汇编需更多寄存器，
-# 属已知难以修复问题；现代 Android 主流为 arm64/armv7）
+# 各 ABI 工具链前缀（仅构建 arm64-v8a）
 declare -A TRIPLE=(
-  [armeabi-v7a]="armv7a-linux-androideabi"
   [arm64-v8a]="aarch64-linux-android"
-  [x86_64]="x86_64-linux-android"
 )
 declare -A CFLAGS_EXTRA=(
-  [armeabi-v7a]="-march=armv7-a -mfpu=neon -mfloat-abi=softfp"
   [arm64-v8a]=""
-  [x86_64]=""
 )
 
 build_abi() {
@@ -37,12 +32,7 @@ build_abi() {
   local triple="${TRIPLE[$abi]}"
   local cc="${TOOLCHAIN}/bin/${triple}${API_LEVEL}-clang"
   local cxx="${TOOLCHAIN}/bin/${triple}${API_LEVEL}-clang++"
-  local arch
-  case "$abi" in
-    armeabi-v7a) arch="armv7-a" ;;
-    arm64-v8a)   arch="aarch64" ;;
-    x86_64)      arch="x86_64" ;;
-  esac
+  local arch="aarch64"
 
   echo "[ffmpeg] ==== 构建 Android ${abi} (arch=${arch}) ===="
   export STAGE_INSTALL="${STAGE_ROOT}/install-android-${abi}"
@@ -52,11 +42,6 @@ build_abi() {
 
   local extra_cflags=(-DANDROID -fPIC ${CFLAGS_EXTRA[$abi]})
   local extra_ldflags="-L${TOOLCHAIN}/sysroot/usr/lib/${triple}/${API_LEVEL}"
-  # x86_64 需要 nasm 才能编手写汇编；NDK 不带 nasm，关闭以产出有效库
-  local arch_opts=()
-  if [ "$arch" = "x86_64" ]; then
-    arch_opts+=(--disable-x86asm)
-  fi
 
   "${FFMPEG_SOURCE_ROOT}/${FFMPEG_SRC_DIR}/configure" \
     $(ffmpeg_common_config) \
@@ -67,8 +52,7 @@ build_abi() {
     --cxx="${cxx}" \
     --extra-cflags="${extra_cflags[*]}" \
     --extra-ldflags="${extra_ldflags}" \
-    --sysroot="${TOOLCHAIN}/sysroot" \
-    "${arch_opts[@]}"
+    --sysroot="${TOOLCHAIN}/sysroot"
 
   make $(ffmpeg_make_flags)
   make install
@@ -77,7 +61,6 @@ build_abi() {
 
 ffmpeg_fetch_source
 
-# 串行构建 4 个 ABI
 for abi in "${!TRIPLE[@]}"; do
   build_abi "${abi}"
 done
