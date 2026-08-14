@@ -101,6 +101,7 @@ build() {
   cfg+=(--without-ensurepip)      # 不要 pip，减小体积
   cfg+=(--disable-shared)         # 只出静态库
   cfg+=(--without-doc-strings)    # 减小体积
+  cfg+=(--disable-test-modules)   # 不编译测试模块（_testcapi/_ctypes_test 等）
 
   # 交叉编译（Android / iOS / MinGW-Windows）
   if [ -n "${HOST_TRIPLE:-}" ]; then
