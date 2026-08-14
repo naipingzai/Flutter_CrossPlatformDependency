@@ -113,13 +113,16 @@ build() {
 ac_cv_file__dev_ptmx=yes
 ac_cv_file__dev_ptc=no
 EOF
-    # Android(bionic) 缺失部分 POSIX 组/影子密码 API，禁用对应 stdlib 模块
+    # Android(bionic) 缺失部分 API/外部库，禁用对应非必需 stdlib C 模块：
+    #   grp/spwd       无组/影子密码数据库（setgrent 等缺失）
+    #   _ctypes        libffi 头文件未配置进编译路径
+    #   ossaudiodev    OSS 音频设备在 Android 不可用
     if [ "$PLATFORM" = "android" ]; then
       cat >> "$site" <<'EOF'
-ac_cv_func_getgrgid=no
-ac_cv_func_getgrgid_r=no
-ac_cv_func_getspnam=no
-ac_cv_func_getspnam_r=no
+py_cv_module_grp=n/a
+py_cv_module_spwd=n/a
+py_cv_module__ctypes=n/a
+py_cv_module_ossaudiodev=n/a
 EOF
     fi
     export CONFIG_SITE="$site"
