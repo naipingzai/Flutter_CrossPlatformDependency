@@ -9,7 +9,7 @@
 #   lib/<plat>/<arch>/静态库（平台相关）
 #
 # 构建：
-#   - 构建逻辑：dependencies/ffmpeg/build.sh（复用 scripts/common.sh 通用引擎）
+#   - 构建逻辑：dependencies/ffmpeg/build.sh（完全自包含，平台规则在脚本内标注）
 #   - 平台配置：.github/workflows/build_ffmpeg.yml（runner/arch/工具链/参数）
 # ============================================================
 
@@ -23,7 +23,7 @@ source:
 
 build:
   type: static              # 只输出静态库（.a / .lib）
-  engine: autoconf          # 使用 ./configure + make（通用引擎 scripts/common.sh）
+  engine: autoconf          # 使用 ./configure + make（见 build.sh 标注的构建规则）
   output:
     include: include/
     lib: lib/

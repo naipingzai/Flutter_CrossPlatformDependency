@@ -5,8 +5,8 @@
 #
 # 架构设计（遵循 skill）：
 #   - 平台配置全部集中在本 YAML（runner / 工具链 / ARCH / 编译参数）。
-#   - 构建逻辑复用 scripts/common.sh 通用引擎，平台无业务分支。
-#   - 新增依赖时：复制 dependencies/<dep>/build.sh + 本文件对应 Job。
+#   - 每个依赖一个目录，build.sh 完全自包含（平台规则在脚本内清晰标注）。
+#   - 新增依赖时：复制 dependencies/<dep>/ 模板 + 本文件对应 Job，互不影响。
 #
 # 产物（每个平台打包 ffmpeg-<plat>.tar.gz 上传）：
 #   ffmpeg/<plat>/<arch>/{include,lib}

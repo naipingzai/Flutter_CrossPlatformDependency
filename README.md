@@ -8,12 +8,12 @@ APP 仓库（如 `Flutter_FileManager`）**不维护第三方库的跨平台编�
 
 ---
 
-## 1. 目标与原则
+## 1. 设计原则
 
-- **平台配置集中在 workflow（YAML）**，按平台清晰区分（runner / 工具链 / ARCH / 编译参数）。
-- **构建逻辑复用通用引擎** `scripts/common.sh`，脚本内不做平台业务分支。
-- **每个依赖一个目录** `dependencies/<dep>/`，新增依赖遵循统一规范，保证结构一致、可维护、可扩展。
-- **统一产物结构**，便于 APP 端按平台自动消费。
+- **每个库完全独立、零耦合**：每个依赖自成目录，内含自包含的 `build.sh`，不依赖仓库内任何其他脚本。新增/修改某个库**不会影响其他库**。
+- **平台配置集中在 workflow（YAML）**：runner / 工具链 / ARCH / 编译参数都在 `.github/workflows/build_<dep>.yml`。
+- **编译规则在 `build.sh` 内清晰标注**：下载、平台、configure、产物整理分别成段。
+- **目录尽量扁平、简单**：每个库 = `build.sh` + `dependency.yaml`，外加仓库级 workflow 一个文件。
 
 ---
 
@@ -21,125 +21,60 @@ APP 仓库（如 `Flutter_FileManager`）**不维护第三方库的跨平台编�
 
 ```text
 Flutter_CrossPlatformDependency/
-├── scripts/
-│   └── common.sh                通用构建引擎（下载 / configure / make / 整理产物）
-│
 ├── dependencies/
-│   └── <dep>/                   每个第三方库一个目录（规范结构见 §4）
-│       ├── build.sh             依赖构建入口（复用 common.sh）
-│       └── dependency.yaml      依赖配置（版本 / 平台 / 产物结构）
+│   └── <dep>/                        # 每个第三方库一个独立目录（见 §3 规范）
+│       ├── build.sh                  # 自包含构建脚本（内含标注的编译规则）
+│       └── dependency.yaml           # 依赖配置（版本 / 平台 / 产物结构）
 │
-├── toolchains/                  （预留）CMake 型依赖的跨编译工具链
+├── toolchains/                       # （可选）CMake 型依赖的跨编译工具链
 │   ├── android.cmake
 │   └── ios.cmake
 │
 └── .github/workflows/
-    ├── build_<dep>.yml          平台矩阵 + 发布 Release（规范结构见 §5）
-    └── ...
+    └── build_<dep>.yml               # 该库的平台矩阵 + 发布 Release（每个库一份）
 ```
 
----
-
-## 2.1 当前已支持依赖
-
-| 依赖 | 版本 | 产物 tag | 构建工作流 |
-|------|------|----------|-----------|
-| FFmpeg | n7.1 | `ffmpeg-n7.1` | `build_ffmpeg.yml` |
-
-新增依赖后在此登记（对应 §4 步骤 6）。
+> 库之间没有共享脚本，`toolchains/` 仅是 CMake 型依赖的独立参考文件。
 
 ---
 
-## 3. 通用引擎 `scripts/common.sh`
+## 3. 新增一个开源库的规范流程
 
-`common.sh` 提供对 `configure + make` 型（autoconf 型）第三方库的通用构建能力。
-**平台无业务分支**，唯一的平台分支点是 `PLATFORM` → `target-os / 交叉编译开关`。
+每个库 = **1 个目录 + 1 个 workflow 文件**，完全独立。按以下步骤做即可。
 
-### 3.1 依赖侧需设置的变量（在 `dependencies/<dep>/build.sh` 中）
-
-| 变量 | 必填 | 说明 |
-|------|:----:|------|
-| `DEP_NAME` | ✅ | 依赖名，决定产物目录名（如 `ffmpeg`） |
-| `DEP_URL` | ✅ | 源码归档 URL |
-| `DEP_TARBALL` | ✅ | 归档文件名（`.tar.xz` / `.tar.gz`） |
-| `DEP_SRC_DIR` | ✅ | 解压后的源码目录名 |
-| `DEP_STATIC` | 否 | `1`=静态库（默认） `0`=动态库 |
-| `CONFIGURE_FLAGS` | 否 | 依赖自身的 configure 参数 |
-| `DEP_SOURCE_ROOT` | 否 | 源码下载目录（默认 `$RUNNER_TEMP/<dep>-src`） |
-| `DEP_STAGE_ROOT` | 否 | 产物暂存目录（默认 `$RUNNER_TEMP/<dep>-stage`） |
-
-### 3.2 平台侧注入的变量（由 workflow 的每个平台 Job 设置）
-
-| 变量 | 说明 |
-|------|------|
-| `PLATFORM` | `linux` / `windows` / `macos` / `android` / `ios` |
-| `ARCH` | 架构：`x86_64` / `arm64` / `aarch64` ... |
-| `ARCH_DIR` | 产物子目录名（Android ABI 名 / macOS arch，默认 = `ARCH`） |
-| `CC` / `CXX` | 编译器（交叉编译时指定） |
-| `SYSROOT` | 系统根目录（交叉编译时指定） |
-| `CROSS_PREFIX` | 交叉工具链前缀（可选） |
-| `EXTRA_CFLAGS` | 额外编译参数（如 `-DANDROID -fPIC`） |
-| `EXTRA_LDFLAGS` | 额外链接参数（注意需带 `-L` 前缀） |
-| `PLAT_OUT` | 产物平台目录名（默认 = `PLATFORM`） |
-
-### 3.3 提供的函数
-
-| 函数 | 作用 |
-|------|------|
-| `dep_fetch_source` | 下载并解压源码（已存在则跳过；兼容 `.tar.xz` / `.tar.gz`） |
-| `dep_build` | 组装 configure 参数 → configure → make → make install |
-| `dep_stage_output` | 把 `include/`、`lib/` 整理到统一产物结构 |
-| `dep_make_flags` | 生成并行编译参数 `-j<N>` |
-
-`dep_build` 产出的目标 OS 映射：`linux→linux`、`windows→mingw32`、`macos→darwin`、`android→android`、`ios→darwin`；`macos/android/ios` 自动开启交叉编译；`ios` 自动加 `--disable-asm`。
-
----
-
-## 4. 新增一个开源库的规范流程
-
-> 以下为**新增依赖的统一标准流程**。严格照做即可让新库与现有实现保持一致。
-
-### 步骤 1：创建依赖目录
+### 步骤 1：创建依赖目录，复制自包含模板
 
 ```bash
-mkdir -p dependencies/<dep>
+cp -r dependencies/ffmpeg dependencies/<dep>
 ```
 
-### 步骤 2：编写 `dependencies/<dep>/build.sh`
+### 步骤 2：改写 `dependencies/<dep>/build.sh`
 
-复制 `dependencies/ffmpeg/build.sh`，只修改三处：
+`build.sh` 是**自包含脚本**，结构固定，规则分段清晰：
+
+| 段落 | 内容 | 需修改？ |
+|------|------|:--------:|
+| **规则 A 依赖常量** | 库名、版本、源码 URL、configure 参数 | ✅ 必须 |
+| **规则 B 平台规则** | 目标 OS 映射、交叉编译开关 | ⚠️ 一般不改 |
+| **规则 C 下载规则** | 下载并解压源码 | 不改 |
+| **规则 D 构建规则** | 组装 configure → make → install | ⚠️ 视库而定 |
+| **规则 E 产物整理** | 输出到统一结构 | 不改 |
+
+**规则 A 只需改这几处**：
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../../scripts/common.sh"
-
-# ① 依赖常量
-export DEP_NAME="<dep>"
+DEP_NAME="<dep>"                                    # 库名（决定产物目录）
 DEP_VERSION="<x.y.z>"
-export DEP_TARBALL="<dep>-${DEP_VERSION}.tar.xz"
-export DEP_URL="https://.../${DEP_TARBALL}"
-export DEP_SRC_DIR="<dep>-${DEP_VERSION}"
-export DEP_STATIC="1"
+DEP_TARBALL="<dep>-${DEP_VERSION}.tar.xz"
+DEP_URL="https://.../${DEP_TARBALL}"
+DEP_SRC_DIR="<dep>-${DEP_VERSION}"
 
-# ② 源码/stage 目录（保持默认）
-export DEP_SOURCE_ROOT="${DEP_SOURCE_ROOT:-${RUNNER_TEMP:-/tmp}/${DEP_NAME}-src}"
-export DEP_STAGE_ROOT="${DEP_STAGE_ROOT:-${RUNNER_TEMP:-/tmp}/${DEP_NAME}-stage}"
-export DEP_OUTPUT_DIR="${DEP_NAME}"
-
-# ③ 依赖自身的 configure 参数（可选）
-export CONFIGURE_FLAGS="<--xxx --yyy ...>"
-
-# 执行（三行固定）
-dep_fetch_source
-dep_build
-dep_stage_output
+DEP_CONFIGURE_FLAGS="<--xxx --yyy ...>"             # 本库自身的 configure 参数
 ```
 
-**约束**：只修改源码常量与 `CONFIGURE_FLAGS`，**不要**在脚本里写平台分支。
+> 若新库的 configure/构建方式差异较大，只需在「规则 D」内调整，不影响其他库。
 
-### 步骤 3：编写 `dependencies/<dep>/dependency.yaml`
+### 步骤 3：改写 `dependencies/<dep>/dependency.yaml`
 
 ```yaml
 name: <dep>
@@ -147,11 +82,11 @@ version: "<x.y.z>"
 
 source:
   url: https://.../<dep>-<x.y.z>.tar.xz
-  sha256: ""               # 可选，留空不校验
+  sha256: ""
 
 build:
-  type: static             # 只输出静态库（.a / .lib）
-  engine: autoconf         # configure + make（复用 scripts/common.sh）
+  type: static             # 静态库（.a / .lib）
+  engine: autoconf         # ./configure + make
   output:
     include: include/
     lib: lib/
@@ -164,86 +99,34 @@ platforms:
   ios:     { enabled: true, arch: [arm64] }
 ```
 
-### 步骤 4：编写 `.github/workflows/build_<dep>.yml`
+### 步骤 4：改写 `.github/workflows/build_<dep>.yml`
 
-复制 `build_ffmpeg.yml`，按以下模板套用（各平台 Job 结构固定）：
+复制 `build_ffmpeg.yml`，改四处：
 
-```yaml
-name: Build <Dep> Static Libs
+| 位置 | 改法 |
+|------|------|
+| `name` | `Build <Dep> Static Libs` |
+| `on.push.tags` | `<dep>-*` |
+| `env.RELEASE_TAG` | `<dep>-<version>`（如 `ffmpeg-n7.1`） |
+| 每个 Job 的 `bash dependencies/...` | 指向 `dependencies/<dep>/build.sh` |
 
-on:
-  workflow_dispatch:
-  push:
-    tags: ['<dep>-*']          # 触发 tag 按依赖命名
+各平台 Job 的**环境变量注入规则**（照抄即用，见下方 §4）。
 
-permissions:
-  contents: write
+### 步骤 5：在 `README.md` §8 登记新库，并触发验证
 
-env:
-  RELEASE_TAG: "<dep>-<version>"   # 如 ffmpeg-n7.1
+---
 
-jobs:
-  # ---- 每个平台一个 Job，结构：环境变量 → 装工具链 → Build → Package → upload ----
-  linux:
-    runs-on: ubuntu-24.04
-    env: { PLATFORM: linux, ARCH: x86_64, ARCH_DIR: x86_64 }
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y make gcc g++ xz-utils curl
-      - name: Build
-        run: bash dependencies/<dep>/build.sh
-      - name: Package
-        run: |
-          cd "${RUNNER_TEMP}/<dep>-stage/<dep>"
-          tar -czf "${RUNNER_TEMP}/<dep>-linux.tar.gz" linux
-      - uses: actions/upload-artifact@v4
-        with:
-          name: <dep>-linux
-          path: ${{ runner.temp }}/<dep>-linux.tar.gz
+## 4. 平台 Job 模板速查（每个库的 workflow 都相同结构）
 
-  # Windows: 需 msys2 + cygpath；macOS/iOS: xcrun 在 run 内求值；
-  # Android: setup-ndk 注入 CC/CXX/SYSROOT/EXTRA_LDFLAGS(-L)
-  # ...（其余平台同上，按 ffmpeg 示例逐平台配置）
-
-  release:
-    runs-on: ubuntu-24.04
-    needs: [linux, windows, macos, android, ios]
-    if: always()
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with: { path: release-assets, merge-multiple: true }
-      - name: Create/Update Release
-        env: { GH_TOKEN: ${{ github.token }}, RELEASE_TAG: ${{ env.RELEASE_TAG }} }
-        run: |
-          gh release delete "${RELEASE_TAG}" --yes --cleanup-tag 2>/dev/null || true
-          gh release create "${RELEASE_TAG}" \
-            --title "<Dep> ${RELEASE_TAG}" \
-            --notes "<Dep> <版本> 跨平台静态库" \
-            $(find release-assets -type f -name '*.tar.gz')
-```
-
-### 步骤 5：平台 Job 模板速查（照抄即用）
-
-| 平台 | runner | 关键设置 |
+| 平台 | runner | 关键规则 |
 |------|--------|----------|
-| **Linux** | `ubuntu-24.04` | apt 装 `make gcc g++ xz-utils curl`；Build 直接 `bash .../build.sh` |
-| **Windows** | `windows-latest` + `msys2/setup-msys2` | `msystem: MINGW64`；`defaults.run.shell: msys2 {0}`；Package 用 `cygpath` 转路径 |
-| **macOS** | `macos-14` | 在 `run:` 内 `export CC/SYSROOT=$(xcrun ...)`（勿放 `env:`，`$()` 在 env 里按字面量） |
-| **Android** | `ubuntu-24.04` + `nttld/setup-ndk` | 用 `${{ steps.ndk.outputs.ndk-path }}` 拼 `CC/CXX/SYSROOT`；`EXTRA_LDFLAGS` 需带 `-L`；`EXTRA_CFLAGS=-DANDROID -fPIC` |
-| **iOS** | `macos-14` | `run:` 内 `export CC/SYSROOT=$(xcrun --sdk iphoneos ...)` |
+| **Linux** | `ubuntu-24.04` | apt 装 `make gcc g++ xz-utils curl`；`env: {PLATFORM: linux, ARCH: x86_64, ARCH_DIR: x86_64}` |
+| **Windows** | `windows-latest` + `msys2/setup-msys2` | `msystem: MINGW64` + `defaults.run.shell: msys2 {0}`；Package 用 `cygpath` 转路径；装 `mingw-w64-x86_64-gcc` |
+| **macOS** | `macos-14` | 在 `run:` 内 `export CC/SYSROOT=$(xcrun --sdk macosx ...)`（**勿放 `env:`**，`$()` 在 env 里按字面量） |
+| **Android** | `ubuntu-24.04` + `nttld/setup-ndk` | 用 `${{ steps.ndk.outputs.ndk-path }}` 拼 `CC/CXX/SYSROOT`；`EXTRA_CFLAGS=-DANDROID -fPIC`；`EXTRA_LDFLAGS` **必须带 `-L`** |
+| **iOS** | `macos-14` | 在 `run:` 内 `export CC/SYSROOT=$(xcrun --sdk iphoneos ...)` |
 
-### 步骤 6：更新 `README.md`
-
-- 在「支持的依赖」表中登记新库、版本、产物 tag。
-- 保持本规范文档与当前实现一致。
-
-### 步骤 7：触发并验证
-
-- 手动：Actions → `Build <Dep> Static Libs` → Run workflow。
-- 或推送 tag：`git tag <dep>-<version> && git push origin <dep>-<version>`。
-- 验证 Release 已生成 `<dep>-<plat>.tar.gz`，且解压结构为 `<dep>/<plat>/<arch>/{include,lib}`。
+每个 Job 结构固定：**装工具链 → `bash dependencies/<dep>/build.sh` → 打包 → upload**。
 
 ---
 
@@ -263,36 +146,39 @@ jobs:
 | `android` | `arm64-v8a` |
 | `ios` | `arm64` |
 
-每个平台打包为 `ffmpeg-<plat>.tar.gz` 上传；`release` Job 汇总后发布到对应 tag 的 GitHub Release。
+每个平台打包为 `<dep>-<plat>.tar.gz`，`release` Job 汇总后发布到对应 tag 的 GitHub Release。
 
 ---
 
-## 6. APP 端如何消费
+## 6. 平台构建已知要点
+
+1. **Windows 用 MSYS2/MinGW64 原生构建**，不要加 `--cross-prefix`（会找不到 `ar`）。
+2. **macOS/iOS 的 `CC`/`SYSROOT`**：`$(xcrun ...)` 必须在 `run:` 内 `export`。
+3. **Android `EXTRA_LDFLAGS` 必须带 `-L`**（裸目录当链接参数会失败）。
+4. **只构建 64 位**：Android `arm64-v8a`；32 位 x86 会触发内联汇编寄存器不足。
+5. **macOS 只构建 `arm64`**（Apple Silicon）；arm64 runner 上交叉编 x86_64 有 FFmpeg 汇编问题。
+
+---
+
+## 7. APP 端如何消费
 
 APP 的 CMake 在配置阶段按当前平台/ABI，从本仓库 Release 下载对应 tarball：
 
-```cmake
-# 例：FFmpeg
-https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/ffmpeg-n7.1/ffmpeg-<plat>.tar.gz
+```text
+https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/<dep>-<version>/<dep>-<plat>.tar.gz
 ```
 
-解压后得到 `ffmpeg/<plat>/<arch>/{include,lib}`，APP 将 `include/` 加入头文件路径，
-将 `lib/` 中的静态库链接进 Native 库即可。APP 不参与任何第三方库编译。
+解压得 `<dep>/<plat>/<arch>/{include,lib}`，APP 把 `include/` 加入头文件路径、把 `lib/` 静态库链接进 Native 库即可。APP 不参与任何第三方库编译。
 
 ---
 
-## 7. 平台构建已知要点 / 注意事项
+## 8. 当前已支持依赖
 
-1. **Windows 必须是 MSYS2/MinGW64 原生构建**，不要加 `--cross-prefix`（会找不到 `ar`）。
-2. **macOS/iOS 的 `CC`/`SYSROOT` 用 `$(xcrun ...)` 时必须在 `run:` 内 `export`**，放在 `env:` 中会按字面量处理导致编译失败。
-3. **Android `EXTRA_LDFLAGS` 必须带 `-L` 前缀**（裸目录会被当链接参数导致失败）。
-4. **Android 只构建 64 位 `arm64-v8a`**；32 位 x86 会触发 FFmpeg 内联汇编寄存器不足问题。
-5. **macOS 只构建 `arm64`**（Apple Silicon）：arm64 runner 上交叉编 x86_64 会触发 FFmpeg x86 内联汇编与 clang 的约束错误。
-6. **产物 stage 目录**：构建脚本输出到 `$RUNNER_TEMP/<dep>-stage/<dep>/<plat>/<arch>`，workflow 的 Package 步骤据此打包。
+| 依赖 | 版本 | 产物 tag | 工作流 |
+|------|------|----------|--------|
+| FFmpeg | n7.1 | `ffmpeg-n7.1` | `build_ffmpeg.yml` |
 
----
+## 9. 触发构建
 
-## 8. 触发构建
-
-- **手动**：仓库 Actions 页 → 选择对应 workflow → **Run workflow**。
+- **手动**：Actions → 对应 workflow → **Run workflow**。
 - **tag 推送**：推送形如 `<dep>-*` 的 tag（如 `ffmpeg-n7.1`）自动触发对应 workflow。
