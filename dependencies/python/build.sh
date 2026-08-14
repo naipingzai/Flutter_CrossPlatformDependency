@@ -94,6 +94,8 @@ build() {
   # 交叉编译（Android / iOS / MinGW-Windows）
   if [ -n "${HOST_TRIPLE:-}" ]; then
     cfg+=(--host="${HOST_TRIPLE}" --build="$(build_triple)")
+    # 交叉编译时 getaddrinfo 运行时测试无法执行，需关闭 IPv6
+    cfg+=(--disable-ipv6)
     if [ -n "${BUILD_PYTHON:-}" ]; then
       cfg+=(--with-build-python="${BUILD_PYTHON}")
     else
