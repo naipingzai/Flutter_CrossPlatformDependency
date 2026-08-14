@@ -1,0 +1,208 @@
+# ============================================================
+# build_miniz.yml
+# ============================================================
+# 编译 miniz 2.2.0 各平台静态库并发布到 GitHub Release。
+# 遵循 skill：平台配置集中在本 YAML；build.sh 完全自包含。
+#
+# 产物（每个平台打包 miniz-<plat>.tar.gz 上传）：
+#   miniz/<plat>/<arch>/{include,lib}
+# release Job 汇总并发布到 tag miniz-2.2.0 的 Release。
+#
+# 触发：手动 workflow_dispatch 或 push tag（miniz-*）。
+# ============================================================
+
+name: Build miniz Static Libs
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'miniz-*'
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: "miniz-2.2.0"
+
+jobs:
+  # ============================================================
+  # Linux: x86_64
+  # ============================================================
+  linux:
+    name: Linux x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PLATFORM: linux
+      ARCH: x86_64
+      ARCH_DIR: x86_64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y make gcc curl xz-utils
+      - name: Build
+        run: bash dependencies/miniz/build.sh
+      - name: Package
+        run: |
+          cd "${RUNNER_TEMP}/miniz-stage/miniz"
+          tar -czf "${RUNNER_TEMP}/miniz-linux.tar.gz" linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: miniz-linux
+          path: ${{ runner.temp }}/miniz-linux.tar.gz
+          if-no-files-found: error
+
+  # ============================================================
+  # Windows: x86_64（MSYS2/MinGW64 原生构建）
+  # ============================================================
+  windows:
+    name: Windows x86_64
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: msys2 {0}
+    env:
+      PLATFORM: windows
+      ARCH: x86_64
+      ARCH_DIR: x86_64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git make tar mingw-w64-x86_64-gcc mingw-w64-x86_64-xz
+      - name: Build
+        run: bash dependencies/miniz/build.sh
+      - name: Package
+        run: |
+          STAGE="$(cygpath -u "${RUNNER_TEMP}/miniz-stage/miniz")"
+          OUT="$(cygpath -u "${RUNNER_TEMP}/miniz-windows.tar.gz")"
+          cd "${STAGE}"
+          tar -czf "${OUT}" windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: miniz-windows
+          path: ${{ runner.temp }}/miniz-windows.tar.gz
+          if-no-files-found: error
+
+  # ============================================================
+  # macOS: arm64（Apple Silicon）
+  # ============================================================
+  macos:
+    name: macOS arm64
+    runs-on: macos-14
+    timeout-minutes: 90
+    env:
+      PLATFORM: macos
+      ARCH: arm64
+      ARCH_DIR: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          export CC="$(xcrun --sdk macosx --find clang)"
+          bash dependencies/miniz/build.sh
+      - name: Package
+        run: |
+          cd "${RUNNER_TEMP}/miniz-stage/miniz"
+          tar -czf "${RUNNER_TEMP}/miniz-macos.tar.gz" macos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: miniz-macos
+          path: ${{ runner.temp }}/miniz-macos.tar.gz
+          if-no-files-found: error
+
+  # ============================================================
+  # Android: arm64-v8a
+  # ============================================================
+  android:
+    name: Android arm64-v8a
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      PLATFORM: android
+      ARCH: aarch64
+      ARCH_DIR: arm64-v8a
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+          add-to-path: false
+      - name: Build
+        env:
+          CC: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
+          AR: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+          EXTRA_CFLAGS: "-DANDROID"
+        run: bash dependencies/miniz/build.sh
+      - name: Package
+        run: |
+          cd "${RUNNER_TEMP}/miniz-stage/miniz"
+          tar -czf "${RUNNER_TEMP}/miniz-android.tar.gz" android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: miniz-android
+          path: ${{ runner.temp }}/miniz-android.tar.gz
+          if-no-files-found: error
+
+  # ============================================================
+  # iOS: arm64 真机
+  # ============================================================
+  ios:
+    name: iOS arm64
+    runs-on: macos-14
+    timeout-minutes: 90
+    env:
+      PLATFORM: ios
+      ARCH: arm64
+      ARCH_DIR: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          export CC="$(xcrun --sdk iphoneos --find clang)"
+          bash dependencies/miniz/build.sh
+      - name: Package
+        run: |
+          cd "${RUNNER_TEMP}/miniz-stage/miniz"
+          tar -czf "${RUNNER_TEMP}/miniz-ios.tar.gz" ios
+      - uses: actions/upload-artifact@v4
+        with:
+          name: miniz-ios
+          path: ${{ runner.temp }}/miniz-ios.tar.gz
+          if-no-files-found: error
+
+  # ============================================================
+  # Release: 汇总各平台 tarball 并发布
+  # ============================================================
+  release:
+    name: Publish Release
+    runs-on: ubuntu-24.04
+    needs: [linux, windows, macos, android, ios]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: List assets
+        run: ls -lh release-assets/
+      - name: Create/Update Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          gh release delete "${RELEASE_TAG}" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "${RELEASE_TAG}" \
+            --title "miniz ${RELEASE_TAG}" \
+            --notes "miniz 2.2.0 跨平台静态库（include + lib/<plat>/<arch>）" \
+            $(find release-assets -type f -name '*.tar.gz')
+          echo "Release 创建完成: ${RELEASE_TAG}"

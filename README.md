@@ -186,6 +186,13 @@ https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/
 |------|------|----------|--------|------|
 | FFmpeg | n7.1 | `ffmpeg-n7.1` | `build_ffmpeg.yml` | linux/windows/macos/android/ios |
 | Python | 3.12.7 | `python-3.12.7` | `build_python.yml` | linux/macos/windows/android/ios（Windows 用 embeddable 包，iOS 用 Python-Apple-support） |
+| miniz | 2.2.0 | `miniz-2.2.0` | `build_miniz.yml` | linux/windows/macos/android/ios |
+| stb_image | 2c980bb（固定提交） | `stb_image-2c980bb` | `build_stb_image.yml` | linux/windows/macos/android/ios |
+
+> **miniz / stb_image 说明**：二者为无 autoconf 的简单 C 库，`build.sh` 直接编译为
+> `libminiz.a` / `libstb_image.a`。stb_image 在独立编译单元内定义
+> `STB_IMAGE_IMPLEMENTATION`，消费方只包含声明并链接该库。
+> miniz 的 `miniz_export.h` 由上游 amalgamate 生成、源码包不含，脚本会自动生成 stub。
 
 > **Python 特别说明**：产物为**可嵌入解释器**，结构为
 > `python/<plat>/<arch>/{include,lib}`，其中 `lib/` 内含
@@ -206,6 +213,8 @@ https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/
 |------|----------|
 | FFmpeg | `ffmpeg-n7.1` |
 | Python | `python-3.12.7` |
+| miniz | `miniz-2.2.0` |
+| stb_image | `stb_image-2c980bb` |
 
 ### 9.2 首次触发（打 tag 并推送）
 
