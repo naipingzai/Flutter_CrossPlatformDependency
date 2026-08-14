@@ -173,6 +173,15 @@ https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/
 | 依赖 | 版本 | 产物 tag | 工作流 |
 |------|------|----------|--------|
 | FFmpeg | n7.1 | `ffmpeg-n7.1` | `build_ffmpeg.yml` |
+| Python | 3.12.7 | `python-3.12.7` | `build_python.yml` |
+
+> **Python 特别说明**：产物为**可嵌入解释器**，结构为
+> `python/<plat>/<arch>/{include,lib}`，其中 `lib/` 内含
+> `libpython3.x.a`（静态解释器）与 `python3.x/`（标准库）。
+> Linux / macOS 为原生构建（已在本机验证可嵌入：C 程序静态链接
+> `libpython3.12.a` 并成功运行 Python）。
+> Android / iOS / Windows(MinGW) 为交叉编译，需要 `--host` 三元组与
+> 同版本的 `BUILD_PYTHON`（主机 python），属于进阶能力，可能需按 CI 结果迭代。
 
 ## 9. 触发构建
 
