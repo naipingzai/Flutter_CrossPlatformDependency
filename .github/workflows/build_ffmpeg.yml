@@ -172,7 +172,7 @@ jobs:
           CXX: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang++"
           SYSROOT: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
           EXTRA_CFLAGS: "-DANDROID -fPIC"
-          EXTRA_LDFLAGS: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21"
+          EXTRA_LDFLAGS: "-L${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21"
         run: bash dependencies/ffmpeg/build.sh
       - name: Package
         run: |
