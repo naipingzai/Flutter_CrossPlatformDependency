@@ -65,7 +65,6 @@ jobs:
       PLATFORM: windows
       ARCH: x86_64
       ARCH_DIR: x86_64
-      HOST: x86_64-w64-mingw32
     steps:
       - uses: actions/checkout@v4
       - uses: msys2/setup-msys2@v2
@@ -99,7 +98,6 @@ jobs:
       PLATFORM: macos
       ARCH: arm64
       ARCH_DIR: arm64
-      HOST: aarch64-apple-darwin
     steps:
       - uses: actions/checkout@v4
       - name: Build
@@ -127,7 +125,6 @@ jobs:
       PLATFORM: android
       ARCH: aarch64
       ARCH_DIR: arm64-v8a
-      HOST: aarch64-linux-android
     steps:
       - uses: actions/checkout@v4
       - name: Install Android NDK
@@ -139,6 +136,7 @@ jobs:
       - name: Build
         env:
           CC: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
+          AR: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
           EXTRA_CFLAGS: "-DANDROID"
         run: bash dependencies/sqlite/build.sh
       - name: Package
@@ -162,7 +160,6 @@ jobs:
       PLATFORM: ios
       ARCH: arm64
       ARCH_DIR: arm64
-      HOST: aarch64-apple-darwin
     steps:
       - uses: actions/checkout@v4
       - name: Build

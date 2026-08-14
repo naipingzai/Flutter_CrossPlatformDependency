@@ -3,10 +3,11 @@
 # build.sh - SQLite 跨平台静态库构建（自包含）
 # ============================================================
 # 本脚本完全独立，不依赖仓库内任何其他脚本。
-# 平台相关值（ARCH / CC / SYSROOT / EXTRA_CFLAGS 等）由
+# 平台相关值（ARCH / CC / AR / EXTRA_CFLAGS / SYSROOT 等）由
 # .github/workflows/build_sqlite.yml 通过环境变量注入。
 #
-# SQLite 用官方 autoconf 构建，产出 libsqlite3.a。
+# 直接用 CC 编译 SQLite amalgamation（sqlite3.c），避免 autoconf
+# 交叉编译问题，与 miniz/stb_image 一致，产出 libsqlite3.a。
 #
 # 用法：bash dependencies/sqlite/build.sh
 # ============================================================
@@ -21,32 +22,15 @@ DEP_TARBALL="sqlite-autoconf-${DEP_VERSION}.tar.gz"
 DEP_URL="https://www.sqlite.org/2024/${DEP_TARBALL}"
 DEP_SRC_DIR="sqlite-autoconf-${DEP_VERSION}"
 
-# SQLite 精简配置：静态库，精简不需要的组件
-DEP_CONFIGURE_FLAGS="
---enable-static
---disable-shared
---disable-dynamic-extensions
---disable-fts3
---disable-rtree"
-
 # 源码 / 产物暂存目录
 DEP_SOURCE_ROOT="${DEP_SOURCE_ROOT:-${RUNNER_TEMP:-/tmp}/${DEP_NAME}-src}"
 DEP_STAGE_ROOT="${DEP_STAGE_ROOT:-${RUNNER_TEMP:-/tmp}/${DEP_NAME}-stage}"
 
 # ============================================================
-# 【规则 B】平台规则
+# 【规则 B】平台规则 —— 仅需 CC/AR
 # ============================================================
-platform_needs_cross() {
-  case "$PLATFORM" in
-    macos|android|ios) echo 1 ;;
-    *) echo 0 ;;
-  esac
-}
-
-platform_jobs() {
-  if command -v nproc >/dev/null 2>&1; then echo "$(nproc)";
-  else echo "$(sysctl -n hw.ncpu 2>/dev/null || echo 2)"; fi
-}
+platform_cc()  { echo "${CC:-cc}"; }
+platform_ar()  { echo "${AR:-ar}"; }
 
 # ============================================================
 # 【规则 C】下载规则
@@ -72,32 +56,37 @@ fetch_source() {
     t="${DEP_SOURCE_ROOT}/${DEP_TARBALL}"; p="${DEP_SOURCE_ROOT}"
   fi
   tar -xzf "$t" -C "$p"
+  # amalgamation 需含 sqlite3.c / sqlite3.h
+  test -f "${DEP_SOURCE_ROOT}/${DEP_SRC_DIR}/sqlite3.c"
   echo "[${DEP_NAME}] 源码就绪: ${DEP_SOURCE_ROOT}/${DEP_SRC_DIR}"
 }
 
 # ============================================================
-# 【规则 D】构建规则 —— configure / make / install
+# 【规则 D】构建规则 —— 直接编译 amalgamation
 # ============================================================
 build() {
-  local cross
-  cross="$(platform_needs_cross)"
+  local cc ar
+  cc="$(platform_cc)"; ar="$(platform_ar)"
 
   local src="${DEP_SOURCE_ROOT}/${DEP_SRC_DIR}"
   local inst="${DEP_STAGE_ROOT}/install-${PLATFORM}-${ARCH}"
-  rm -rf "$inst"
+  rm -rf "$inst"; mkdir -p "$inst/include" "$inst/lib"
   local bd="${DEP_SOURCE_ROOT}/build-${PLATFORM}-${ARCH}"
   rm -rf "$bd"; mkdir -p "$bd"
 
-  local cfg=()
-  cfg+=(--prefix="$inst")
-  cfg+=($DEP_CONFIGURE_FLAGS)
-  if [ -n "${CC:-}" ];        then cfg+=(--cc="${CC}"); fi
-  if [ -n "${HOST:-}" ];      then cfg+=(--host="${HOST}"); fi
-  if [ -n "${EXTRA_CFLAGS:-}" ]; then cfg+=(CFLAGS="${EXTRA_CFLAGS}"); fi
+  local cflags=(-O2 -fPIC)
+  if [ -n "${EXTRA_CFLAGS:-}" ]; then cflags+=($EXTRA_CFLAGS); fi
+  if [ -n "${SYSROOT:-}" ]; then cflags+=("-isysroot" "${SYSROOT}"); fi
 
-  echo "[${DEP_NAME}] configure: ${cfg[*]}"
-  (cd "$bd" && "$src/configure" "${cfg[@]}")
-  (cd "$bd" && make -j"$(platform_jobs)" && make install)
+  echo "[${DEP_NAME}] 编译 sqlite3.c"
+  "${cc}" "${cflags[@]}" -c "${src}/sqlite3.c" -o "${bd}/sqlite3.o"
+
+  echo "[${DEP_NAME}] 归档 libsqlite3.a"
+  "${ar}" rcs "${inst}/lib/libsqlite3.a" "${bd}/sqlite3.o"
+
+  # 复制头文件
+  cp "${src}/sqlite3.h"     "${inst}/include/sqlite3.h"
+  cp "${src}/sqlite3ext.h"  "${inst}/include/sqlite3ext.h"
 }
 
 # ============================================================
@@ -110,7 +99,6 @@ stage_output() {
   rm -rf "$out"; mkdir -p "$out"
   cp -a "${DEP_STAGE_ROOT}/install-${PLATFORM}-${ARCH}/include" "$out/include"
   cp -a "${DEP_STAGE_ROOT}/install-${PLATFORM}-${ARCH}/lib"     "$out/lib"
-  rm -f "$out"/lib/*.la "$out"/lib/pkgconfig/* 2>/dev/null || true
   echo "[${DEP_NAME}] 已产出: ${out}"
 }
 
