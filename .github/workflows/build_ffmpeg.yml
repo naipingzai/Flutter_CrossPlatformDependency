@@ -122,6 +122,10 @@ jobs:
         run: |
           export CC="$(xcrun --sdk macosx --find clang)"
           export SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          # 在 arm64 runner 上交叉编 x86_64，必须用 -arch 强制 clang 目标为 x86_64，
+          # 否则 configure 误判为 32 位 x86（导致内联汇编约束错误）
+          export EXTRA_CFLAGS="-arch x86_64"
+          export EXTRA_LDFLAGS="-arch x86_64"
           bash dependencies/ffmpeg/build.sh
       - name: Merge universal (lipo)
         run: |
