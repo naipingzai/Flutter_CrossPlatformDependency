@@ -168,13 +168,33 @@ jobs:
           if-no-files-found: error
 
   # ============================================================
+  # iOS: arm64 真机（pybee/Python-Apple-support，官方认可的 iOS 构建）
+  # ============================================================
+  ios:
+    name: iOS arm64
+    runs-on: macos-14
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build iOS Python
+        run: bash dependencies/python/build_ios.sh
+      - name: Package
+        run: |
+          cd "${RUNNER_TEMP}/python-stage/python"
+          tar -czf "${RUNNER_TEMP}/python-ios.tar.gz" ios
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-ios
+          path: ${{ runner.temp }}/python-ios.tar.gz
+          if-no-files-found: error
+
+  # ============================================================
   # Release: 汇总各平台 tarball 并发布
-  # 注：iOS 上游 CPython 不支持 autoconf 交叉编译，故不纳入本工作流。
   # ============================================================
   release:
     name: Publish Release
     runs-on: ubuntu-24.04
-    needs: [linux, macos, windows, android]
+    needs: [linux, macos, windows, android, ios]
     if: always()
     steps:
       - uses: actions/checkout@v4

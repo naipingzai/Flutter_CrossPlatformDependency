@@ -37,9 +37,10 @@ platforms:
     abi: [arm64-v8a]
     # 交叉编译需提供与目标同版本的 BUILD_PYTHON（进阶，见 README 注意事项）
   ios:
-    enabled: false
-    # 上游 CPython 的 autoconf 不支持 iOS 交叉编译（configure 直接报错），
-    # iOS 内嵌 Python 需改用第三方预编译方案，本仓库不提供。
+    enabled: true
+    arch: [arm64]
+    # 上游 CPython autoconf 不支持 iOS 交叉编译，
+    # 改用 pybee/Python-Apple-support 构建（见 build_ios.sh）
   windows:
     enabled: true
     arch: [x86_64]
