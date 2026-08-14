@@ -8,42 +8,40 @@
 # APP 仓库不维护第三方库的跨平台编译逻辑，
 # 只从本仓库的 Release 下载对应平台的 include/ 与 lib/ 使用。
 #
-# 支持的平台：
+# == 架构 ==
+#   平台配置集中在 .github/workflows/*.yml（runner / 工具链 / ARCH / 参数）。
+#   构建逻辑复用 scripts/common.sh 通用引擎（平台无业务分支）。
+#   每个依赖一个目录：dependencies/<dep>/（build.sh + dependency.yaml）。
+#
+#   新增依赖步骤：
+#     1. mkdir dependencies/<dep>/ 并编写 build.sh（设置源码常量 + 依赖 configure 参数）
+#     2. 编写 dependency.yaml（版本 / 平台 / 产物结构）
+#     3. 在 .github/workflows/ 新增 <dep>.yml（平台 Job 矩阵 + Release 发布）
+#
+# == 支持的平台（64 位） ==
 #   Windows  x86_64
-#   Linux    x86_64 / aarch64
+#   Linux    x86_64
 #   macOS    universal (arm64 + x86_64)
-#   Android  armeabi-v7a / arm64-v8a / x86 / x86_64
+#   Android  arm64-v8a
 #   iOS      arm64（真机）
 #
 # == 目录结构 ==
+#   scripts/
+#     common.sh            通用构建引擎（autoconf 型：下载/configure/make/整理）
 #   dependencies/
 #     ffmpeg/
-#       dependency.yaml      依赖配置（版本、平台、输出结构）
-#       scripts/
-#         common.sh          共用逻辑（下载源码、configure、整理产物）
-#         build_linux.sh
-#         build_windows.sh
-#         build_macos.sh
-#         build_android.sh
-#         build_ios.sh
-#       cmake/               预留：未来 CMake 型依赖的配置
-#   toolchains/
-#     android.cmake          Android NDK CMake 工具链
-#     ios.cmake              iOS CMake 工具链
+#       build.sh           依赖构建入口（复用 common.sh）
+#       dependency.yaml    依赖配置（版本/平台/产物结构）
+#   toolchains/            （预留 CMake 型依赖的工具链）
 #   .github/workflows/
-#     build_ffmpeg.yml       编译 FFmpeg 并发布 Release
+#     build_ffmpeg.yml     平台矩阵 + 发布 Release
 #
-# == 如何触发 FFmpeg 构建 ==
-#   - 手动：GitHub Actions 页面点击 "Run workflow"（workflow_dispatch）
-#   - 或推送 tag：git tag ffmpeg-7.1 && git push origin ffmpeg-7.1
-#
-# 构建完成后自动把产物打包上传到 Release（tag: ffmpeg-n7.1）。
+# == 如何触发构建 ==
+#   - 手动：Actions → 对应 workflow → Run workflow
+#   - 或推送 tag（如 ffmpeg-* 触发 build_ffmpeg.yml）
 #
 # == 产物统一结构 ==
 #   ffmpeg/<plat>/<arch>/include/
 #   ffmpeg/<plat>/<arch>/lib/
 #   其中 <plat>: windows / linux / macos / android / ios
-#        <arch>: x86_64 / aarch64 / universal / arm64 / armeabi-v7a / ...
-#
-# 后续新增依赖（sqlite / openssl / libarchive / ...）时，
-# 在 dependencies/ 下新建同名目录，遵循相同规范即可。
+#        <arch>: x86_64 / arm64 / universal / arm64-v8a

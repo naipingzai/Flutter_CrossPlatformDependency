@@ -7,6 +7,10 @@
 # 输出统一结构：
 #   include/          头文件（所有平台一致）
 #   lib/<plat>/<arch>/静态库（平台相关）
+#
+# 构建：
+#   - 构建逻辑：dependencies/ffmpeg/build.sh（复用 scripts/common.sh 通用引擎）
+#   - 平台配置：.github/workflows/build_ffmpeg.yml（runner/arch/工具链/参数）
 # ============================================================
 
 name: ffmpeg
@@ -19,9 +23,7 @@ source:
 
 build:
   type: static              # 只输出静态库（.a / .lib）
-  # FFmpeg 使用自带的 ./configure + make，不适用 CMake。
-  # 配置细节见 scripts/build_*.sh
-  configure: "./configure"
+  engine: autoconf          # 使用 ./configure + make（通用引擎 scripts/common.sh）
   output:
     include: include/
     lib: lib/
@@ -30,7 +32,6 @@ platforms:
   windows:
     enabled: true
     arch: [x86_64]
-    # 使用 msys2/mingw-w64 交叉编译，生成 x86_64 静态库
   linux:
     enabled: true
     arch: [x86_64]
