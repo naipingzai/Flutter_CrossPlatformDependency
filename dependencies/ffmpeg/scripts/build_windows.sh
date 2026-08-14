@@ -24,6 +24,8 @@ echo "[ffmpeg] 准备 Windows 构建环境"
 # 在 msys2/mingw 下 gcc 即 mingw-w64 gcc
 command -v gcc >/dev/null || { echo "未找到 gcc (mingw-w64)。请在 MSYS2 MinGW64 环境运行"; exit 1; }
 
+# 在 msys2/mingw64 环境下原生构建 Windows（非交叉编译），
+# 直接使用 PATH 中的 gcc / ar / ranlib，无需 cross-prefix
 echo "[ffmpeg] ==== 构建 Windows x86_64 ===="
 ffmpeg_fetch_source
 export STAGE_INSTALL="${STAGE_ROOT}/install-windows-x86_64"
@@ -33,9 +35,7 @@ mkdir -p "${build_dir}" && cd "${build_dir}"
 "${FFMPEG_SOURCE_ROOT}/${FFMPEG_SRC_DIR}/configure" \
   $(ffmpeg_common_config) \
   --arch=x86_64 \
-  --target-os=mingw32 \
-  --cross-prefix=x86_64-w64-mingw32- \
-  --enable-cross-compile
+  --target-os=mingw32
 make $(ffmpeg_make_flags)
 make install
 ffmpeg_stage_output "windows" "x86_64"
