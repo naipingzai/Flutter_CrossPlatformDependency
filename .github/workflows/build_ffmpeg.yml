@@ -69,13 +69,16 @@ jobs:
           msystem: MINGW64
           update: true
           install: >-
-            git make mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm mingw-w64-x86_64-pkgconf
+            git make tar mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-xz mingw-w64-x86_64-pkgconf
       - name: Build FFmpeg (Windows)
         run: bash dependencies/ffmpeg/scripts/build_windows.sh
       - name: Package
         run: |
-          cd "${RUNNER_TEMP}/ffmpeg-stage/ffmpeg"
-          tar -czf "${RUNNER_TEMP}/ffmpeg-windows.tar.gz" windows
+          STAGE="$(cygpath -u "${RUNNER_TEMP}/ffmpeg-stage/ffmpeg")"
+          OUT="$(cygpath -u "${RUNNER_TEMP}/ffmpeg-windows.tar.gz")"
+          cd "${STAGE}"
+          tar -czf "${OUT}" windows
       - uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-windows

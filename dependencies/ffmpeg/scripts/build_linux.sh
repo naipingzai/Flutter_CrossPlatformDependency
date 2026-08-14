@@ -2,7 +2,9 @@
 # ============================================================
 # build_linux.sh - 编译 Linux 静态库 (x86_64 / aarch64)
 # ============================================================
-# 在 ubuntu-24.04 runner 上执行。使用宿主 gcc 编译。
+# 在 ubuntu-24.04 runner 上执行。使用宿主 gcc 编译 x86_64，
+# 用 aarch64-linux-gnu-* 交叉编译 aarch64。串行构建，每个架构
+# 使用独立 STAGE_INSTALL 前缀，避免冲突。
 # 产出：${STAGE_ROOT}/ffmpeg/linux/<arch>/{include,lib}
 # ============================================================
 
@@ -10,7 +12,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
-# aarch64 需要交叉编译器
 install_cross() {
   if command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
     return
@@ -28,13 +29,12 @@ build_arch() {
   if [ "$arch" = "aarch64" ]; then
     cc="aarch64-linux-gnu-gcc"
     cxx="aarch64-linux-gnu-g++"
-    extra+=(--enable-cross-compile --arch=aarch64 --target-os=linux)
+    extra+=(--enable-cross-compile --target-os=linux)
   fi
   echo "[ffmpeg] ==== 构建 Linux ${arch} ===="
-  rm -rf "${STAGE_ROOT}/install"
+  export STAGE_INSTALL="${STAGE_ROOT}/install-linux-${arch}"
+  rm -rf "${STAGE_INSTALL}"
   local build_dir="${FFMPEG_SOURCE_ROOT}/build-linux-${arch}"
-  mkdir -p "${build_dir}"
-  # 在源码目录外单独 configure，便于多 arch 并行产物隔离
   mkdir -p "${build_dir}" && cd "${build_dir}"
   "${FFMPEG_SOURCE_ROOT}/${FFMPEG_SRC_DIR}/configure" \
     $(ffmpeg_common_config) \
@@ -48,9 +48,8 @@ build_arch() {
   ffmpeg_stage_output "linux" "${arch}"
 }
 
-# 并行构建两个架构
 install_cross
-build_arch "x86_64" &
-build_arch "aarch64" &
-wait
+ffmpeg_fetch_source
+build_arch "x86_64"
+build_arch "aarch64"
 echo "[ffmpeg] Linux 构建完成"

@@ -3,7 +3,8 @@
 # build_android.sh - 编译 Android 各 ABI 静态库
 # ============================================================
 # 使用 Android NDK 交叉编译 armeabi-v7a / arm64-v8a / x86 / x86_64。
-# NDK 由 workflow 提供（android-ndk r27）。
+# NDK 由 workflow 提供（android-ndk r27）。串行构建，每个 ABI
+# 使用独立 STAGE_INSTALL 前缀。
 # 产出：${STAGE_ROOT}/ffmpeg/android/<abi>/{include,lib}
 # ============================================================
 
@@ -46,7 +47,8 @@ build_abi() {
   esac
 
   echo "[ffmpeg] ==== 构建 Android ${abi} (arch=${arch}) ===="
-  rm -rf "${STAGE_ROOT}/install"
+  export STAGE_INSTALL="${STAGE_ROOT}/install-android-${abi}"
+  rm -rf "${STAGE_INSTALL}"
   local build_dir="${FFMPEG_SOURCE_ROOT}/build-android-${abi}"
   mkdir -p "${build_dir}" && cd "${build_dir}"
 
@@ -69,9 +71,10 @@ build_abi() {
   ffmpeg_stage_output "android" "${abi}"
 }
 
-# 并行构建 4 个 ABI
+ffmpeg_fetch_source
+
+# 串行构建 4 个 ABI
 for abi in "${!TRIPLE[@]}"; do
-  build_abi "${abi}" &
+  build_abi "${abi}"
 done
-wait
 echo "[ffmpeg] Android 构建完成"

@@ -16,7 +16,8 @@ build_arch() {
   local sysroot
   sysroot="$(xcrun --sdk macosx --show-sdk-path)"
   echo "[ffmpeg] ==== 构建 macOS ${arch} ===="
-  rm -rf "${STAGE_ROOT}/install"
+  export STAGE_INSTALL="${STAGE_ROOT}/install-macos-${arch}"
+  rm -rf "${STAGE_INSTALL}"
   local build_dir="${FFMPEG_SOURCE_ROOT}/build-macos-${arch}"
   mkdir -p "${build_dir}" && cd "${build_dir}"
   "${FFMPEG_SOURCE_ROOT}/${FFMPEG_SRC_DIR}/configure" \
@@ -31,9 +32,11 @@ build_arch() {
   # 暂存该架构的 lib 与 include（include 两架构一致，取 arm64 的）
   local lib_dir="${STAGE_ROOT}/macos-libs-${arch}"
   rm -rf "${lib_dir}" && mkdir -p "${lib_dir}"
-  cp -a "${STAGE_ROOT}/install/lib" "${lib_dir}/lib"
-  cp -a "${STAGE_ROOT}/install/include" "${lib_dir}/include"
+  cp -a "${STAGE_INSTALL}/lib" "${lib_dir}/lib"
+  cp -a "${STAGE_INSTALL}/include" "${lib_dir}/include"
 }
+
+ffmpeg_fetch_source
 
 # 依次构建 arm64 与 x86_64（共享源码，串行避免 install 冲突）
 build_arch "arm64"

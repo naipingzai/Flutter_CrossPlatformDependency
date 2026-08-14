@@ -18,7 +18,8 @@ cc="$(xcrun --sdk "${IOS_SDK}" --find clang)"
 
 echo "[ffmpeg] ==== 构建 iOS ${ARCH} (${IOS_SDK}) ===="
 ffmpeg_fetch_source
-rm -rf "${STAGE_ROOT}/install"
+export STAGE_INSTALL="${STAGE_ROOT}/install-ios-${ARCH}"
+rm -rf "${STAGE_INSTALL}"
 build_dir="${FFMPEG_SOURCE_ROOT}/build-ios-${ARCH}"
 mkdir -p "${build_dir}" && cd "${build_dir}"
 

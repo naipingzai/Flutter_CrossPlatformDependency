@@ -26,7 +26,8 @@ command -v gcc >/dev/null || { echo "未找到 gcc (mingw-w64)。请在 MSYS2 Mi
 
 echo "[ffmpeg] ==== 构建 Windows x86_64 ===="
 ffmpeg_fetch_source
-rm -rf "${STAGE_ROOT}/install"
+export STAGE_INSTALL="${STAGE_ROOT}/install-windows-x86_64"
+rm -rf "${STAGE_INSTALL}"
 build_dir="${FFMPEG_SOURCE_ROOT}/build-windows-x86_64"
 mkdir -p "${build_dir}" && cd "${build_dir}"
 "${FFMPEG_SOURCE_ROOT}/${FFMPEG_SRC_DIR}/configure" \
