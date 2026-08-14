@@ -176,7 +176,7 @@ https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/
 | 依赖 | 版本 | 产物 tag | 工作流 | 平台 |
 |------|------|----------|--------|------|
 | FFmpeg | n7.1 | `ffmpeg-n7.1` | `build_ffmpeg.yml` | linux/windows/macos/android/ios |
-| Python | 3.12.7 | `python-3.12.7` | `build_python.yml` | linux/macos/windows/android/ios（iOS 用 Python-Apple-support） |
+| Python | 3.12.7 | `python-3.12.7` | `build_python.yml` | linux/macos/windows/android/ios（Windows 用 embeddable 包，iOS 用 Python-Apple-support） |
 
 > **Python 特别说明**：产物为**可嵌入解释器**，结构为
 > `python/<plat>/<arch>/{include,lib}`，其中 `lib/` 内含
@@ -184,9 +184,11 @@ https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/
 > Linux / macOS 为原生构建（已在本机验证可嵌入：C 程序静态链接
 > `libpython3.12.a` 并成功运行 Python）。
 > Android 为交叉编译（`--host` + `--with-build-python` + `CONFIG_SITE`）。
-> **iOS**：上游 CPython autoconf 不支持，改用官方认可的
-> `pybee/Python-Apple-support` 构建（`build_ios.sh`），产物含
-> `Python.xcframework` 供 APP 链接。
+> **Windows**：CPython 官方用 MSVC/PCbuild（非 autoconf），本仓库改用
+> 官方 **Windows embeddable 包** + 源码头文件 + 生成的导入库
+> （`build_windows.sh`），产出 `python312.dll` + `libpython312.a` + 标准库。
+> **iOS**：用官方认可的 `pybee/Python-Apple-support`（`build_ios.sh`），
+> 产物含 `Python.xcframework` 供 APP 链接。
 
 ## 9. 触发 CI 与推送流程
 

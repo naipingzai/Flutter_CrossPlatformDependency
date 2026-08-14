@@ -21,7 +21,7 @@ if [ "${PLATFORM:-}" = "ios" ]; then
   echo "[${DEP_NAME}] 错误：上游 CPython 的 autoconf 不支持 iOS 交叉编译" >&2
   echo "         （configure 会直接报 'cross build not supported for aarch64-apple-ios'）" >&2
   echo "         iOS 内嵌 Python 需改用第三方预编译方案（如 BeeWare/python-ios），" >&2
-  echo "         本仓库不提供 iOS 产物。" >&2
+  echo "         由 dependencies/python/build_ios.sh 处理，不走本脚本。" >&2
   exit 2
 fi
 

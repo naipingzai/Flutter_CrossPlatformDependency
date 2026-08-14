@@ -44,4 +44,5 @@ platforms:
   windows:
     enabled: true
     arch: [x86_64]
-    # MinGW-w64 方式（进阶，见 README 注意事项）
+    # CPython Windows 官方用 MSVC/PCbuild，非 autoconf。
+    # 用官方 embeddable 包 + 源码头文件 + 导入库（见 build_windows.sh）
