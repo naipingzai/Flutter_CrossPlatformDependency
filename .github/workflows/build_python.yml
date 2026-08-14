@@ -178,7 +178,8 @@ jobs:
       PLATFORM: ios
       ARCH: arm64
       ARCH_DIR: arm64
-      HOST_TRIPLE: arm64-apple-darwin
+      HOST_TRIPLE: aarch64-apple-ios
+      # 注：host 必须与 build(arm64-apple-darwin) 不同，configure 才会进入交叉编译模式
     steps:
       - uses: actions/checkout@v4
       - name: Host python (3.12)
@@ -195,6 +196,7 @@ jobs:
           SYSROOT: "$(xcrun --sdk iphoneos --show-sdk-path)"
         run: |
           export CC="$(xcrun --sdk iphoneos --find clang)"
+          export CXX="$(xcrun --sdk iphoneos --find clang++)"
           export AR="$(xcrun --sdk iphoneos --find ar)"
           export RANLIB="$(xcrun --sdk iphoneos --find ranlib)"
           export SYSROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
