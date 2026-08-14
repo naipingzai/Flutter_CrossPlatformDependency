@@ -168,56 +168,13 @@ jobs:
           if-no-files-found: error
 
   # ============================================================
-  # iOS: arm64 真机（交叉编译，进阶）
-  # ============================================================
-  ios:
-    name: iOS arm64
-    runs-on: macos-14
-    timeout-minutes: 150
-    env:
-      PLATFORM: ios
-      ARCH: arm64
-      ARCH_DIR: arm64
-      HOST_TRIPLE: aarch64-apple-ios
-      # 注：host 必须与 build(arm64-apple-darwin) 不同，configure 才会进入交叉编译模式
-    steps:
-      - uses: actions/checkout@v4
-      - name: Host python (3.12)
-        uses: actions/setup-python@v5
-        id: hostpy
-        with:
-          python-version: '3.12'
-      - name: Build
-        env:
-          BUILD_PYTHON: ${{ steps.hostpy.outputs.python-path }}
-          CC: "$(xcrun --sdk iphoneos --find clang)"
-          AR: "$(xcrun --sdk iphoneos --find ar)"
-          RANLIB: "$(xcrun --sdk iphoneos --find ranlib)"
-          SYSROOT: "$(xcrun --sdk iphoneos --show-sdk-path)"
-        run: |
-          export CC="$(xcrun --sdk iphoneos --find clang)"
-          export CXX="$(xcrun --sdk iphoneos --find clang++)"
-          export AR="$(xcrun --sdk iphoneos --find ar)"
-          export RANLIB="$(xcrun --sdk iphoneos --find ranlib)"
-          export SYSROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
-          bash dependencies/python/build.sh
-      - name: Package
-        run: |
-          cd "${RUNNER_TEMP}/python-stage/python"
-          tar -czf "${RUNNER_TEMP}/python-ios.tar.gz" ios
-      - uses: actions/upload-artifact@v4
-        with:
-          name: python-ios
-          path: ${{ runner.temp }}/python-ios.tar.gz
-          if-no-files-found: error
-
-  # ============================================================
   # Release: 汇总各平台 tarball 并发布
+  # 注：iOS 上游 CPython 不支持 autoconf 交叉编译，故不纳入本工作流。
   # ============================================================
   release:
     name: Publish Release
     runs-on: ubuntu-24.04
-    needs: [linux, macos, windows, android, ios]
+    needs: [linux, macos, windows, android]
     if: always()
     steps:
       - uses: actions/checkout@v4

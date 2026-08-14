@@ -15,6 +15,17 @@
 set -euo pipefail
 
 # ============================================================
+# 平台支持检查（上游限制）
+# ============================================================
+if [ "${PLATFORM:-}" = "ios" ]; then
+  echo "[${DEP_NAME}] 错误：上游 CPython 的 autoconf 不支持 iOS 交叉编译" >&2
+  echo "         （configure 会直接报 'cross build not supported for aarch64-apple-ios'）" >&2
+  echo "         iOS 内嵌 Python 需改用第三方预编译方案（如 BeeWare/python-ios），" >&2
+  echo "         本仓库不提供 iOS 产物。" >&2
+  exit 2
+fi
+
+# ============================================================
 # 【规则 A】依赖常量 —— 新增/升级版本时修改本段
 # ============================================================
 DEP_NAME="python"
@@ -96,6 +107,13 @@ build() {
     cfg+=(--host="${HOST_TRIPLE}" --build="$(build_triple)")
     # 交叉编译时 getaddrinfo 运行时测试无法执行，需关闭 IPv6
     cfg+=(--disable-ipv6)
+    # 交叉编译时无法探测 /dev 设备文件，用 CONFIG_SITE 预置结果
+    local site="${DEP_SOURCE_ROOT}/config-${PLATFORM}.site"
+    cat > "$site" <<EOF
+ac_cv_file__dev_ptmx=yes
+ac_cv_file__dev_ptc=no
+EOF
+    export CONFIG_SITE="$site"
     if [ -n "${BUILD_PYTHON:-}" ]; then
       cfg+=(--with-build-python="${BUILD_PYTHON}")
     else

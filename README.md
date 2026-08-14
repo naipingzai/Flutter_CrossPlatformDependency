@@ -173,18 +173,19 @@ https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/
 
 ## 8. 当前已支持依赖
 
-| 依赖 | 版本 | 产物 tag | 工作流 |
-|------|------|----------|--------|
-| FFmpeg | n7.1 | `ffmpeg-n7.1` | `build_ffmpeg.yml` |
-| Python | 3.12.7 | `python-3.12.7` | `build_python.yml` |
+| 依赖 | 版本 | 产物 tag | 工作流 | 平台 |
+|------|------|----------|--------|------|
+| FFmpeg | n7.1 | `ffmpeg-n7.1` | `build_ffmpeg.yml` | linux/windows/macos/android/ios |
+| Python | 3.12.7 | `python-3.12.7` | `build_python.yml` | linux/macos/windows/android（**iOS 不支持**，见下） |
 
 > **Python 特别说明**：产物为**可嵌入解释器**，结构为
 > `python/<plat>/<arch>/{include,lib}`，其中 `lib/` 内含
 > `libpython3.x.a`（静态解释器）与 `python3.x/`（标准库）。
 > Linux / macOS 为原生构建（已在本机验证可嵌入：C 程序静态链接
 > `libpython3.12.a` 并成功运行 Python）。
-> Android / iOS / Windows(MinGW) 为交叉编译，需要 `--host` 三元组与
-> 同版本的 `BUILD_PYTHON`（主机 python），属于进阶能力，可能需按 CI 结果迭代。
+> Android 为交叉编译（`--host` + `--with-build-python` + `CONFIG_SITE`）。
+> **iOS 暂不支持**：上游 CPython 的 autoconf 不提供 iOS 交叉编译，
+> 需改用第三方预编译方案（如 BeeWare/python-ios）。
 
 ## 9. 触发 CI 与推送流程
 
