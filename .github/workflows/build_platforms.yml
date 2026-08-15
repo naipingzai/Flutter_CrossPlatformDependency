@@ -69,6 +69,7 @@ jobs:
           install: >-
             git make tar unzip mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm
             mingw-w64-x86_64-xz mingw-w64-x86_64-pkg-config mingw-w64-x86_64-binutils
+            mingw-w64-x86_64-gendef mingw-w64-x86_64-tools
       - name: Build
         run: bash dependencies/windows/build.sh
       - name: Package (per-lib)

@@ -154,7 +154,13 @@ build_python() {
   curl -fL --retry 5 --retry-all-errors -o "${SRC_ROOT}/python/embed.zip" "https://www.python.org/ftp/python/${version}/python-${version}-embed-amd64.zip"
   unzip -q -o "${SRC_ROOT}/python/embed.zip" -d "$inst/lib"
   local dll="$(ls "$inst"/lib/python3*.dll 2>/dev/null | head -1)"
-  if [ -n "$dll" ]; then ( cd "$inst/lib" && gendef "$(basename "$dll")" && dlltool -d python312.def -l libpython312.a -D "$(basename "$dll")" && rm -f python312.def ); fi
+  if [ -n "$dll" ]; then
+    if command -v gendef >/dev/null 2>&1 && command -v dlltool >/dev/null 2>&1; then
+      ( cd "$inst/lib" && gendef "$(basename "$dll")" && dlltool -d python312.def -l libpython312.a -D "$(basename "$dll")" && rm -f python312.def )
+    else
+      echo "[python] 警告：无 gendef/dlltool，跳过导入库生成（DLL + 头文件已产出）"
+    fi
+  fi
   stage_lib python
   local out="${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}"
   cp -a "$inst/include" "$out/include"

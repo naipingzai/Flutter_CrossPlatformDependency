@@ -149,14 +149,11 @@ build_python() {
   dl_extract python "https://github.com/python/cpython/archive/refs/tags/v3.12.7.tar.gz" "$DEP_SRC_DIR" "cpython.tar.gz"
   local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
   local bd="${SRC_ROOT}/python/build-${PLATFORM}-${ARCH}"; rm -rf "$bd"; mkdir -p "$bd" && cd "$bd"
-  # macOS 原生构建：用注入的 xcrun clang + -isysroot（SYSROOT），不能 unset
-  export CC="${CC:-$(xcrun --sdk macosx --find clang 2>/dev/null || echo clang)}"
-  local cflags="-O2 -fPIC"
-  [ -n "${SYSROOT:-}" ] && cflags="$cflags -isysroot ${SYSROOT}"
-  [ -n "${EXTRA_CFLAGS:-}" ] && cflags="$cflags ${EXTRA_CFLAGS}"
+  # macOS 原生构建：用系统默认编译器 + SDK（native，host==build，无需 isysroot/交叉）
+  # 避免复用 workflow 为 ffmpeg 注入的 CC/SYSROOT 导致 sizeof 探测失败
+  unset CC CXX CFLAGS LDFLAGS SYSROOT
   "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" --prefix="$inst" \
     --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules \
-    CFLAGS="$cflags" \
     || { echo "==== [python] configure 失败，完整 config.log ===="; cat "${bd}/config.log" 2>/dev/null || true; echo "==== config.log 结束 ===="; exit 1; }
   make -j"$(platform_jobs)"; make install
   stage_lib python
