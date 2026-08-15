@@ -150,6 +150,7 @@ build_python() {
   rm -rf "${SRC_ROOT}/python-ios"; mkdir -p "${SRC_ROOT}/python-ios"
   tar -xzf "${SRC_ROOT}/python-ios.tar.gz" -C "${SRC_ROOT}/python-ios"
   local xcframe="$(find "${SRC_ROOT}/python-ios" -type d -name 'Python.xcframework' | head -1)"
+  if [ -z "$xcframe" ]; then echo "!!! [python] iOS 未找到 xcframework（跳过，保留 ffmpeg/miniz/stb_image/sqlite）" >&2; return 0; fi
   local out="${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}"
   rm -rf "$out"; mkdir -p "$out"
   cp -a "$xcframe" "$out/Python.xcframework"

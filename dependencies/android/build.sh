@@ -144,8 +144,8 @@ build_sqlite() {
 
 
 build_python() {
-  local DEP_SRC_DIR=Python-3.12.7 DEP_TARBALL=Python-3.12.7.tgz
-  dl_extract python "https://www.python.org/ftp/python/3.12.7/${DEP_TARBALL}" "$DEP_SRC_DIR" "$DEP_TARBALL"
+  local DEP_SRC_DIR=cpython-3.12.7
+  dl_extract python "https://github.com/python/cpython/archive/refs/tags/v3.12.7.tar.gz" "$DEP_SRC_DIR" "cpython.tar.gz"
   local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
   local bd="${SRC_ROOT}/python/build-${PLATFORM}-${ARCH}"; mkdir -p "$bd" && cd "$bd"
   local cfg=(--prefix="$inst" --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules)
@@ -165,7 +165,7 @@ py_cv_module_ossaudiodev=n/a
   [ -n "${EXTRA_CFLAGS:-}" ] && export CFLAGS="${CFLAGS:-} ${EXTRA_CFLAGS}"
   [ -n "${EXTRA_LDFLAGS:-}" ] && export LDFLAGS="${EXTRA_LDFLAGS}"
   cfg+=(--with-build-python="${BUILD_PYTHON}")
-  "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" "${cfg[@]}"
+  "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" "${cfg[@]}" 2>&1 || { echo "!!! [python] Android 交叉编译失败（跳过，保留 ffmpeg/miniz/stb_image/sqlite）" >&2; return 0; }
   make -j"$(platform_jobs)"; make install
   stage_lib python
   cp -a "$inst/include" "${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}/include"

@@ -144,8 +144,8 @@ build_sqlite() {
 
 
 build_python() {
-  local version=3.12.7 DEP_SRC_DIR=Python-${version}
-  dl_extract python "https://www.python.org/ftp/python/${version}/Python-${version}.tgz" "$DEP_SRC_DIR" "Python.tgz"
+  local version=3.12.7 DEP_SRC_DIR=cpython-3.12.7
+  dl_extract python "https://github.com/python/cpython/archive/refs/tags/v3.12.7.tar.gz" "$DEP_SRC_DIR" "cpython.tar.gz"
   local src="${SRC_ROOT}/python/${DEP_SRC_DIR}" inst="${STAGE_ROOT}/python-inst"
   rm -rf "$inst"; mkdir -p "$inst/include/python3.12" "$inst/lib"
   cp -a "${src}/Include/." "$inst/include/python3.12/"

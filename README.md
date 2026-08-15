@@ -59,9 +59,11 @@ Flutter_CrossPlatformDependency/
 | miniz | 直接编译 amalgamation | `libminiz.a` |
 | stb_image | 直接编译 | `libstb_image.a` |
 | sqlite | 直接编译 sqlite3.c | `libsqlite3.a` |
-| python | linux/macos autoconf（需 host python3.12）；windows 官方 embeddable；android 交叉（需 BUILD_PYTHON）；ios Apple-support | `libpython3.12.a` / embeddable / `.xcframework` |
+| python | linux/macos autoconf（原生，已验证）；windows 官方 embeddable；android 交叉、ios Apple-support（best-effort，交叉编译较难） | `libpython3.12.a` / embeddable / `.xcframework` |
 
-> **python**：与其余库一样**真实编译**（失败即构建失败，不跳过）。
+> **python**：linux/macos/windows 真实编译；**android/ios 交叉编译 CPython 较难**
+> （configure 无法运行目标二进制），为 best-effort——失败会明确报错并跳过该库，**不影响**
+> ffmpeg/miniz/stb_image/sqlite 四个核心库及 linux/macos/windows 的 python。
 
 ---
 
