@@ -149,9 +149,14 @@ build_python() {
   dl_extract python "https://github.com/python/cpython/archive/refs/tags/v3.12.7.tar.gz" "$DEP_SRC_DIR" "cpython.tar.gz"
   local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
   local bd="${SRC_ROOT}/python/build-${PLATFORM}-${ARCH}"; rm -rf "$bd"; mkdir -p "$bd" && cd "$bd"
-  unset CC CFLAGS
+  # macOS 原生构建：用注入的 xcrun clang + -isysroot（SYSROOT），不能 unset
+  export CC="${CC:-$(xcrun --sdk macosx --find clang 2>/dev/null || echo clang)}"
+  local cflags="-O2 -fPIC"
+  [ -n "${SYSROOT:-}" ] && cflags="$cflags -isysroot ${SYSROOT}"
+  [ -n "${EXTRA_CFLAGS:-}" ] && cflags="$cflags ${EXTRA_CFLAGS}"
   "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" --prefix="$inst" \
-    --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules
+    --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules \
+    CFLAGS="$cflags"
   make -j"$(platform_jobs)"; make install
   stage_lib python
   local out="${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}"
