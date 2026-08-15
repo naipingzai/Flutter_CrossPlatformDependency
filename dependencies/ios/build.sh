@@ -145,8 +145,19 @@ build_sqlite() {
 
 
 build_python() {
-  export DEP_SOURCE_ROOT="${SRC_ROOT}" DEP_STAGE_ROOT="${STAGE_ROOT}"
-  bash "${SCRIPT_DIR}/../python/build_ios.sh"
+  local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
+  curl -fL --retry 5 --retry-all-errors -o "${SRC_ROOT}/python-ios.tar.gz" \
+    "https://github.com/pybee/Python-Apple-support/releases/download/3.12-b4/Python-3.12-b4-iOS-support.b4.tar.gz"
+  rm -rf "${SRC_ROOT}/python-ios"; mkdir -p "${SRC_ROOT}/python-ios"
+  tar -xzf "${SRC_ROOT}/python-ios.tar.gz" -C "${SRC_ROOT}/python-ios"
+  local xcframe="$(find "${SRC_ROOT}/python-ios" -type d -name 'Python.xcframework' | head -1)"
+  local out="${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}"
+  rm -rf "$out"; mkdir -p "$out"
+  cp -a "$xcframe" "$out/Python.xcframework"
+  local slice="$(find "$xcframe" -type d -path '*ios-arm64*' | head -1)"
+  [ -d "$slice/include" ] && cp -a "$slice/include" "$out/include"
+  [ -d "$slice/lib" ] && cp -a "$slice/lib" "$out/lib"
+  echo "[python] 完成（iOS xcframework）"
 }
 
 # ============================================================
