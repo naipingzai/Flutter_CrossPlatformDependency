@@ -167,6 +167,7 @@ build_python() {
   #   ossaudiodev    OSS 音频设备在 Android 不可用
   #   _lzma/_bz2    Android NDK sysroot 无 liblzma/libbz2 头文件
   #   readline       Android 无 GNU readline
+  #   _ssl/_hashlib  Android NDK 无 OpenSSL
   local site="${SRC_ROOT}/config-${PLATFORM}.site"
   printf 'ac_cv_file__dev_ptmx=yes
 ac_cv_file__dev_ptc=no
@@ -177,6 +178,8 @@ py_cv_module_ossaudiodev=n/a
 py_cv_module__lzma=n/a
 py_cv_module__bz2=n/a
 py_cv_module_readline=n/a
+py_cv_module__ssl=n/a
+py_cv_module__hashlib=n/a
 ' > "$site"
   export CONFIG_SITE="$site"
   cfg+=(--with-build-python="${BUILD_PYTHON}")
