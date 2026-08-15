@@ -148,6 +148,8 @@ build_python() {
   dl_extract python "https://www.python.org/ftp/python/3.12.7/${DEP_TARBALL}" "$DEP_SRC_DIR" "$DEP_TARBALL"
   local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
   local bd="${SRC_ROOT}/python/build-${PLATFORM}-${ARCH}"; mkdir -p "$bd" && cd "$bd"
+  # macOS 用默认编译器（xcrun clang 直用无 isysroot 会编译失败）
+  unset CC CFLAGS
   "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" --prefix="$inst" \
     --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules
   make -j"$(platform_jobs)"; make install
