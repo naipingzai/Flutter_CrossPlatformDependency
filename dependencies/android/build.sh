@@ -64,14 +64,11 @@ build_ffmpeg() {
   if [ -n "${EXTRA_CFLAGS:-}" ]; then cfg+=(--extra-cflags="${EXTRA_CFLAGS}"); fi
   if [ -n "${EXTRA_LDFLAGS:-}" ]; then cfg+=(--extra-ldflags="${EXTRA_LDFLAGS}"); fi
   if [ "$PLATFORM" = "ios" ]; then cfg+=(--disable-asm); fi
-  # 关键修复：Android 静态库会被链接进共享库 libfileops.so，必须生成 PIC。
-  # FFmpeg 的 --enable-pic 对 arm64 静态库可能不生效（尤其汇编 .S 文件），
-  # 这里显式把 -fPIC 注入 CFLAGS/CPPFLAGS 与汇编参数，确保所有 C 和汇编均为 PIC。
-  export CFLAGS="${CFLAGS:-} -fPIC"
-  export CPPFLAGS="${CPPFLAGS:-} -fPIC"
+  # Android 静态库会被链接进共享库 libfileops.so，必须生成 PIC。
+  # --enable-pic 已含于 DEP_CONFIGURE_FLAGS，且 workflow 已传 EXTRA_CFLAGS="-DANDROID -fPIC"，
+  # 二者足以让 FFmpeg 的 C 与汇编均为 PIC。此处不做任何 make 参数覆盖，避免破坏头文件搜索路径。
   "${SRC_ROOT}/ffmpeg/${DEP_SRC_DIR}/configure" "${cfg[@]}"
-  make -j"$(platform_jobs)" V=1 CFLAGS="${CFLAGS} -fPIC" ASFLAGS="-fPIC" EXTRA_CFLAGS="${EXTRA_CFLAGS:-} -fPIC" EXTRA_ASFLAGS="-fPIC"
-  make install
+  make -j"$(platform_jobs)"; make install
   # 严格校验：所有目标文件必须为 PIC（不得出现非 PIC 的 ADR_PREL_PG_HI21 重定位）。
   if command -v llvm-readelf >/dev/null 2>&1; then
     local nonpic=0
