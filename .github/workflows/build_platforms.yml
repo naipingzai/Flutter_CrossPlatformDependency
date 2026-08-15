@@ -1,8 +1,8 @@
 # ============================================================
 # build_platforms.yml
-# 每个平台 Job 自包含编译 5 个库（ffmpeg/miniz/stb_image/sqlite/python）
-# 并合并为该平台 {include,lib}，打包上传；release Job（ubuntu）按平台
-# 分别创建 GitHub Release（linux/windows/macos/android/ios）。
+# 每个平台 Job 自包含编译 5 库（ffmpeg/miniz/stb_image/sqlite/python），
+# 各库单独打包为 <lib>.tar.gz 上传；release Job 为每个「平台-库」组合
+# 创建独立 GitHub Release（tag = <platform>-<lib>，如 linux-ffmpeg / windows-sqlite）。
 # 触发：手动 或 push build-* tag。
 # ============================================================
 name: Build All Platforms
@@ -15,6 +15,9 @@ on:
 
 permissions:
   contents: write
+
+env:
+  LIBS: "ffmpeg miniz stb_image sqlite python"
 
 jobs:
   # ============================================================
@@ -30,14 +33,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y nasm yasm make gcc g++ build-essential curl xz-utils
       - name: Build
         run: bash dependencies/linux/build.sh
-      - name: Package
+      - name: Package (per-lib)
         run: |
-          cd "${RUNNER_TEMP}/deps-stage/linux/x86_64"
-          tar -czf "${RUNNER_TEMP}/linux.tar.gz" .
+          mkdir -p "${RUNNER_TEMP}/pkgs"
+          cd "${RUNNER_TEMP}/deps-stage"
+          for lib in ${{ env.LIBS }}; do
+            d="${lib}/linux/x86_64"
+            if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/${lib}.tar.gz" .); fi
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: libs-linux
-          path: ${{ runner.temp }}/linux.tar.gz
+          path: ${{ runner.temp }}/pkgs
           if-no-files-found: error
 
   # ============================================================
@@ -61,15 +68,18 @@ jobs:
             mingw-w64-x86_64-xz mingw-w64-x86_64-pkg-config
       - name: Build
         run: bash dependencies/windows/build.sh
-      - name: Package
+      - name: Package (per-lib)
         run: |
-          STAGE="$(cygpath -u "${RUNNER_TEMP}/deps-stage/windows/x86_64")"
-          OUT="$(cygpath -u "${RUNNER_TEMP}/windows.tar.gz")"
-          cd "${STAGE}" && tar -czf "${OUT}" .
+          mkdir -p "$(cygpath -u "${RUNNER_TEMP}")/pkgs"
+          cd "$(cygpath -u "${RUNNER_TEMP}")/deps-stage"
+          for lib in ${{ env.LIBS }}; do
+            d="${lib}/windows/x86_64"
+            if [ -d "$d" ]; then (cd "$d" && tar -czf "$(cygpath -u "${RUNNER_TEMP}")/pkgs/${lib}.tar.gz" .); fi
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: libs-windows
-          path: ${{ runner.temp }}/windows.tar.gz
+          path: ${{ runner.temp }}/pkgs
           if-no-files-found: error
 
   # ============================================================
@@ -86,14 +96,18 @@ jobs:
           export CC="$(xcrun --sdk macosx --find clang)"
           export SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
           bash dependencies/macos/build.sh
-      - name: Package
+      - name: Package (per-lib)
         run: |
-          cd "${RUNNER_TEMP}/deps-stage/macos/arm64"
-          tar -czf "${RUNNER_TEMP}/macos.tar.gz" .
+          mkdir -p "${RUNNER_TEMP}/pkgs"
+          cd "${RUNNER_TEMP}/deps-stage"
+          for lib in ${{ env.LIBS }}; do
+            d="${lib}/macos/arm64"
+            if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/${lib}.tar.gz" .); fi
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: libs-macos
-          path: ${{ runner.temp }}/macos.tar.gz
+          path: ${{ runner.temp }}/pkgs
           if-no-files-found: error
 
   # ============================================================
@@ -121,14 +135,18 @@ jobs:
           EXTRA_CFLAGS: "-DANDROID -fPIC"
           EXTRA_LDFLAGS: "-L${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21"
         run: bash dependencies/android/build.sh
-      - name: Package
+      - name: Package (per-lib)
         run: |
-          cd "${RUNNER_TEMP}/deps-stage/android/arm64-v8a"
-          tar -czf "${RUNNER_TEMP}/android.tar.gz" .
+          mkdir -p "${RUNNER_TEMP}/pkgs"
+          cd "${RUNNER_TEMP}/deps-stage"
+          for lib in ${{ env.LIBS }}; do
+            d="${lib}/android/arm64-v8a"
+            if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/${lib}.tar.gz" .); fi
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: libs-android
-          path: ${{ runner.temp }}/android.tar.gz
+          path: ${{ runner.temp }}/pkgs
           if-no-files-found: error
 
   # ============================================================
@@ -145,21 +163,25 @@ jobs:
           export CC="$(xcrun --sdk iphoneos --find clang)"
           export SYSROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
           bash dependencies/ios/build.sh
-      - name: Package
+      - name: Package (per-lib)
         run: |
-          cd "${RUNNER_TEMP}/deps-stage/ios/arm64"
-          tar -czf "${RUNNER_TEMP}/ios.tar.gz" .
+          mkdir -p "${RUNNER_TEMP}/pkgs"
+          cd "${RUNNER_TEMP}/deps-stage"
+          for lib in ${{ env.LIBS }}; do
+            d="${lib}/ios/arm64"
+            if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/${lib}.tar.gz" .); fi
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: libs-ios
-          path: ${{ runner.temp }}/ios.tar.gz
+          path: ${{ runner.temp }}/pkgs
           if-no-files-found: error
 
   # ============================================================
-  # Release：按平台创建 GitHub Release
+  # Release：按「平台-库」创建独立 GitHub Release（tag = <platform>-<lib>）
   # ============================================================
   release:
-    name: Publish Releases (per-platform)
+    name: Publish Releases (per platform-lib)
     runs-on: ubuntu-24.04
     needs: [linux, windows, macos, android, ios]
     if: always()
@@ -168,18 +190,20 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: release-assets
-      - name: Create per-platform Releases
+      - name: Create per platform-lib Releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           for plat in linux windows macos android ios; do
-            f="release-assets/libs-${plat}/${plat}.tar.gz"
-            if [ -f "$f" ]; then
-              gh release delete "${plat}" --yes --cleanup-tag 2>/dev/null || true
-              gh release create "${plat}" --title "${plat} 预编译库" \
-                --notes "ffmpeg / miniz / stb_image / sqlite / python" "$f"
-              echo "${plat} 已发布"
-            else
-              echo "${plat} 无产物，跳过"
-            fi
+            for lib in ffmpeg miniz stb_image sqlite python; do
+              f="release-assets/libs-${plat}/${lib}.tar.gz"
+              if [ -f "$f" ]; then
+                tag="${plat}-${lib}"
+                gh release delete "${tag}" --yes --cleanup-tag 2>/dev/null || true
+                gh release create "${tag}" --title "${tag} 预编译库" --notes "${lib}" "$f"
+                echo "${tag} 已发布"
+              else
+                echo "${plat}-${lib} 无产物，跳过"
+              fi
+            done
           done
