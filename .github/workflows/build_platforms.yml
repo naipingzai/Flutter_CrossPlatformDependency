@@ -39,7 +39,7 @@ jobs:
           cd "${RUNNER_TEMP}/deps-stage"
           for lib in ${{ env.LIBS }}; do
             d="${lib}/linux/x86_64"
-            if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/${lib}.tar.gz" .); fi
+            if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/linux-${lib}.tar.gz" .); fi
           done
       - uses: actions/upload-artifact@v4
         with:
@@ -74,7 +74,7 @@ jobs:
           cd "$(cygpath -u "${RUNNER_TEMP}")/deps-stage"
           for lib in ${{ env.LIBS }}; do
             d="${lib}/windows/x86_64"
-            if [ -d "$d" ]; then (cd "$d" && tar -czf "$(cygpath -u "${RUNNER_TEMP}")/pkgs/${lib}.tar.gz" .); fi
+            if [ -d "$d" ]; then (cd "$d" && tar -czf "$(cygpath -u "${RUNNER_TEMP}")/pkgs/windows-${lib}.tar.gz" .); fi
           done
       - uses: actions/upload-artifact@v4
         with:
@@ -102,7 +102,7 @@ jobs:
           cd "${RUNNER_TEMP}/deps-stage"
           for lib in ${{ env.LIBS }}; do
             d="${lib}/macos/arm64"
-            if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/${lib}.tar.gz" .); fi
+            if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/macos-${lib}.tar.gz" .); fi
           done
       - uses: actions/upload-artifact@v4
         with:
@@ -141,7 +141,7 @@ jobs:
           cd "${RUNNER_TEMP}/deps-stage"
           for lib in ${{ env.LIBS }}; do
             d="${lib}/android/arm64-v8a"
-            if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/${lib}.tar.gz" .); fi
+            if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/android-${lib}.tar.gz" .); fi
           done
       - uses: actions/upload-artifact@v4
         with:
@@ -169,7 +169,7 @@ jobs:
           cd "${RUNNER_TEMP}/deps-stage"
           for lib in ${{ env.LIBS }}; do
             d="${lib}/ios/arm64"
-            if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/${lib}.tar.gz" .); fi
+            if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/ios-${lib}.tar.gz" .); fi
           done
       - uses: actions/upload-artifact@v4
         with:
@@ -190,20 +190,19 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: release-assets
-      - name: Create per platform-lib Releases
+      - name: Create per-platform Releases (含各库 tarball)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           for plat in linux windows macos android ios; do
-            for lib in ffmpeg miniz stb_image sqlite python; do
-              f="release-assets/libs-${plat}/${lib}.tar.gz"
-              if [ -f "$f" ]; then
-                tag="${plat}-${lib}"
-                gh release delete "${tag}" --yes --cleanup-tag 2>/dev/null || true
-                gh release create "${tag}" --title "${tag} 预编译库" --notes "${lib}" "$f"
-                echo "${tag} 已发布"
-              else
-                echo "${plat}-${lib} 无产物，跳过"
-              fi
-            done
+            FILES=$(ls "release-assets/libs-${plat}"/*.tar.gz 2>/dev/null || true)
+            if [ -n "${FILES}" ]; then
+              gh release delete "${plat}" --yes --cleanup-tag 2>/dev/null || true
+              gh release create "${plat}" --title "${plat} 预编译库" \
+                --notes "ffmpeg / miniz / stb_image / sqlite / python（每库一个 tarball）" \
+                ${FILES}
+              echo "${plat} 已发布"
+            else
+              echo "${plat} 无产物，跳过"
+            fi
           done
