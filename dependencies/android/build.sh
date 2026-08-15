@@ -177,7 +177,11 @@ py_cv_module_ossaudiodev=n/a
   [ -n "${EXTRA_CFLAGS:-}" ] && export CFLAGS="${CFLAGS:-} ${EXTRA_CFLAGS}"
   [ -n "${EXTRA_LDFLAGS:-}" ] && export LDFLAGS="${LDFLAGS:-} ${EXTRA_LDFLAGS}"
   echo "[python] configure: ${cfg[*]}"
-  "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" "${cfg[@]}"
+  if ! "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" "${cfg[@]}"; then
+    echo "[python] configure 失败，config.log 尾部：" >&2
+    tail -40 "${bd}/config.log" 2>/dev/null >&2 || true
+    exit 1
+  fi
   make -j"$(platform_jobs)"; make install
   stage_lib python
   local out="${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}"

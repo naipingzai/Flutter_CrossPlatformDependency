@@ -147,14 +147,14 @@ build_sqlite() {
 build_python() {
   local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
   curl -fL --retry 5 --retry-all-errors -o "${SRC_ROOT}/python-ios.tar.gz" \
-    "https://github.com/pybee/Python-Apple-support/releases/download/3.12-b4/Python-3.12-b4-iOS-support.b4.tar.gz"
+    "https://github.com/pybee/Python-Apple-support/releases/download/3.12-b9/Python-3.12-iOS-support.b9.tar.gz"
   rm -rf "${SRC_ROOT}/python-ios"; mkdir -p "${SRC_ROOT}/python-ios"
   tar -xzf "${SRC_ROOT}/python-ios.tar.gz" -C "${SRC_ROOT}/python-ios"
   local xcframe="$(find "${SRC_ROOT}/python-ios" -type d -name 'Python.xcframework' | head -1)"
   local out="${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}"
   rm -rf "$out"; mkdir -p "$out"
   cp -a "$xcframe" "$out/Python.xcframework"
-  local slice="$(find "$xcframe" -type d -path '*ios-arm64*' | head -1)"
+  local slice="$(find "$xcframe" -type d -name 'ios-arm64' | head -1)"
   [ -d "$slice/include" ] && cp -a "$slice/include" "$out/include"
   [ -d "$slice/lib" ] && cp -a "$slice/lib" "$out/lib"
   # 严格检查：xcframework + 头文件必须真实存在，否则视为构建失败
