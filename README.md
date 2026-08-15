@@ -10,10 +10,13 @@ APP 仓库（如 `Flutter_FileManager`）**不维护第三方库的跨平台编�
 
 ## 1. 设计原则
 
-- **每个库完全独立、零耦合**：每个依赖自成目录，内含自包含的 `build.sh`，不依赖仓库内任何其他脚本。新增/修改某个库**不会影响其他库**。
-- **平台配置集中在 workflow（YAML）**：runner / 工具链 / ARCH / 编译参数都在 `.github/workflows/build_<dep>.yml`。
-- **编译规则在 `build.sh` 内清晰标注**：下载、平台、configure、产物整理分别成段。
-- **目录尽量扁平、简单**：每个库 = `build.sh` + `dependency.yaml`，外加仓库级 workflow 一个文件。
+- **按平台组织**：目录以平台为顶层维度，每个平台目录**完全自包含**，
+  编译该平台所需的全部库（ffmpeg / miniz / stb_image / sqlite / python）。
+- **构建逻辑复用已验证脚本**：各库的编译函数照抄自 per-tool 已验证脚本，
+  仅做平台编排（工具链 env）与产物合并。
+- **平台配置集中在 workflow**：runner / 工具链 / ARCH 在
+  `.github/workflows/build_platforms.yml` 对应平台 Job。
+- **产物按平台区分**：每个平台一个 GitHub Release（linux/windows/macos/android/ios）。
 
 ---
 
@@ -22,243 +25,64 @@ APP 仓库（如 `Flutter_FileManager`）**不维护第三方库的跨平台编�
 ```text
 Flutter_CrossPlatformDependency/
 ├── dependencies/
-│   └── <dep>/                        # 每个第三方库一个独立目录（见 §3 规范）
-│       ├── build.sh                  # 通用 autoconf 构建脚本（内含标注的编译规则）
-│       ├── build_<plat>.sh           # 平台专用构建脚本（仅当该平台工具链特殊时才需要）
-│       ├── README.md                 # （可选）该依赖的构建说明
-│       └── dependency.yaml           # 依赖配置（版本 / 平台 / 产物结构）
-│
+│   ├── linux/   build.sh     # Linux x86_64：ffmpeg/miniz/stb_image/sqlite/python
+│   ├── windows/ build.sh     # Windows x86_64（MSYS2/MinGW64）
+│   ├── macos/   build.sh     # macOS arm64
+│   ├── android/ build.sh     # Android arm64-v8a（NDK 交叉）
+│   └── ios/     build.sh     # iOS arm64
 └── .github/workflows/
-    └── build_<dep>.yml               # 该库的平台矩阵 + 发布 Release（每个库一份）
+    └── build_platforms.yml   # 5 个平台 Job + release Job（按平台发布）
 ```
 
-> - 库之间没有共享脚本，完全独立。
-> - 大多数库只需一个通用 `build.sh`（autoconf，规则 A–E）。若某平台工具链特殊
->   （如 CPython 的 Windows/iOS），才在该依赖目录下另加 `build_<plat>.sh`，并让
->   workflow 对应 Job 调用它（参考 `dependencies/python/`）。
+每个 `dependencies/<platform>/build.sh` 是自包含脚本，包含 5 个库的构建函数：
+
+| 库 | 构建方式 |
+|----|---------|
+| ffmpeg | autoconf（按平台 target-os，交叉加 --enable-cross-compile） |
+| miniz | 直接编译 amalgamation → libminiz.a |
+| stb_image | 直接编译 → libstb_image.a |
+| sqlite | 直接编译 sqlite3.c → libsqlite3.a |
+| python | linux/macos autoconf；windows 官方 embeddable；android 交叉(best-effort)；ios Apple-support(best-effort) |
+
+> **python** 为 best-effort：构建失败仅明确告警、跳过合并，**不影响**
+> ffmpeg/miniz/stb_image/sqlite 四个核心库的产出。
 
 ---
 
-## 3. 新增一个开源库的规范流程
+## 3. 产物
 
-每个库 = **1 个目录 + 1 个 workflow 文件**，完全独立。按以下步骤做即可。
-
-### 步骤 1：创建依赖目录，复制自包含模板
-
-```bash
-cp -r dependencies/ffmpeg dependencies/<dep>
-```
-
-### 步骤 2：改写 `dependencies/<dep>/build.sh`
-
-`build.sh` 是**自包含脚本**，结构固定，规则分段清晰：
-
-| 段落 | 内容 | 需修改？ |
-|------|------|:--------:|
-| **规则 A 依赖常量** | 库名、版本、源码 URL、configure 参数 | ✅ 必须 |
-| **规则 B 平台规则** | 目标 OS 映射、交叉编译开关 | ⚠️ 一般不改 |
-| **规则 C 下载规则** | 下载并解压源码 | 不改 |
-| **规则 D 构建规则** | 组装 configure → make → install | ⚠️ 视库而定 |
-| **规则 E 产物整理** | 输出到统一结构 | 不改 |
-
-**规则 A 只需改这几处**：
-
-```bash
-DEP_NAME="<dep>"                                    # 库名（决定产物目录）
-DEP_VERSION="<x.y.z>"
-DEP_TARBALL="<dep>-${DEP_VERSION}.tar.xz"
-DEP_URL="https://.../${DEP_TARBALL}"
-DEP_SRC_DIR="<dep>-${DEP_VERSION}"
-
-DEP_CONFIGURE_FLAGS="<--xxx --yyy ...>"             # 本库自身的 configure 参数
-```
-
-> 若新库的 configure/构建方式差异较大，只需在「规则 D」内调整，不影响其他库。
->
-> **平台工具链特殊的库**：若某平台无法用通用 autoconf 构建（如 CPython 的
-> Windows/iOS），在该依赖目录下另加 `build_<plat>.sh`，workflow 对应 Job 调用它。
-> 参见 `dependencies/python/`（`build_windows.sh` / `build_ios.sh`）与其 README。
-
-### 步骤 3：改写 `dependencies/<dep>/dependency.yaml`
-
-```yaml
-name: <dep>
-version: "<x.y.z>"
-
-source:
-  url: https://.../<dep>-<x.y.z>.tar.xz
-  sha256: ""
-
-build:
-  type: static             # 静态库（.a / .lib）
-  engine: autoconf         # ./configure + make
-  output:
-    include: include/
-    lib: lib/
-
-platforms:
-  windows: { enabled: true, arch: [x86_64] }
-  linux:   { enabled: true, arch: [x86_64] }
-  macos:   { enabled: true, arch: [arm64] }
-  android: { enabled: true, abi: [arm64-v8a], min_sdk: 21 }
-  ios:     { enabled: true, arch: [arm64] }
-```
-
-### 步骤 4：改写 `.github/workflows/build_<dep>.yml`
-
-复制 `build_ffmpeg.yml`，改四处：
-
-| 位置 | 改法 |
-|------|------|
-| `name` | `Build <Dep> Static Libs` |
-| `on.push.tags` | `<dep>-*` |
-| `env.RELEASE_TAG` | `<dep>-<version>`（如 `ffmpeg-n7.1`） |
-| 每个 Job 的 `bash dependencies/...` | 指向 `dependencies/<dep>/build.sh` |
-
-各平台 Job 的**环境变量注入规则**（照抄即用，见下方 §4）。
-
-### 步骤 5：登记并触发验证
-
-- 在 `README.md` §8 登记新库。
-- 按 §9 推送 tag（或手动触发）跑通 CI，并验证 Release 产物。
-
----
-
-## 4. 平台 Job 模板速查（每个库的 workflow 都相同结构）
-
-| 平台 | runner | 关键规则 |
-|------|--------|----------|
-| **Linux** | `ubuntu-24.04` | apt 装 `make gcc g++ xz-utils curl`；`env: {PLATFORM: linux, ARCH: x86_64, ARCH_DIR: x86_64}` |
-| **Windows** | `windows-latest` + `msys2/setup-msys2` | `msystem: MINGW64` + `defaults.run.shell: msys2 {0}`；Package 用 `cygpath` 转路径；装 `mingw-w64-x86_64-gcc` |
-| **macOS** | `macos-14` | 在 `run:` 内 `export CC/SYSROOT=$(xcrun --sdk macosx ...)`（**勿放 `env:`**，`$()` 在 env 里按字面量） |
-| **Android** | `ubuntu-24.04` + `nttld/setup-ndk` | 用 `${{ steps.ndk.outputs.ndk-path }}` 拼 `CC/CXX/SYSROOT`；`EXTRA_CFLAGS=-DANDROID -fPIC`；`EXTRA_LDFLAGS` **必须带 `-L`** |
-| **iOS** | `macos-14` | 在 `run:` 内 `export CC/SYSROOT=$(xcrun --sdk iphoneos ...)` |
-
-每个 Job 结构固定：**装工具链 → `bash dependencies/<dep>/build.sh` → 打包 → upload**。
-
----
-
-## 5. 产物统一结构
+每个平台合并为 `include/` + `lib/`，打包 `<platform>.tar.gz`，发布到以平台名命名的
+GitHub Release（`linux` / `windows` / `macos` / `android` / `ios`）：
 
 ```text
-<dep>/<plat>/<arch>/
-├── include/              头文件（所有平台一致）
-└── lib/                  静态库（平台相关）
+<platform>.tar.gz -> { include, lib }
+include/  各库头文件（libav*/、sqlite3.h、stb_image.h、miniz.h、Python.h...）
+lib/      各库静态库（libav*.a、libsqlite3.a、libstb_image.a、libminiz.a、libpython3.12.a...）
 ```
 
-| `<plat>` | `<arch>` |
-|----------|----------|
-| `windows` | `x86_64` |
-| `linux` | `x86_64` |
-| `macos` | `arm64` |
-| `android` | `arm64-v8a` |
-| `ios` | `arm64` |
-
-每个平台打包为 `<dep>-<plat>.tar.gz`，`release` Job 汇总后发布到对应 tag 的 GitHub Release。
+架构：linux x86_64 / windows x86_64 / macos arm64 / android arm64-v8a / ios arm64。
 
 ---
 
-## 6. 平台构建已知要点
+## 4. 触发 CI
 
-1. **Windows 用 MSYS2/MinGW64 原生构建**，不要加 `--cross-prefix`（会找不到 `ar`）。
-2. **macOS/iOS 的 `CC`/`SYSROOT`**：`$(xcrun ...)` 必须在 `run:` 内 `export`。
-3. **Android `EXTRA_LDFLAGS` 必须带 `-L`**（裸目录当链接参数会失败）。
-4. **只构建 64 位**：Android `arm64-v8a`；32 位 x86 会触发内联汇编寄存器不足。
-5. **macOS 只构建 `arm64`**（Apple Silicon）；arm64 runner 上交叉编 x86_64 有 FFmpeg 汇编问题。
-
----
-
-## 7. APP 端如何消费
-
-APP 的 CMake 在配置阶段按当前平台/ABI，从本仓库 Release 下载对应 tarball：
-
-```text
-https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/<dep>-<version>/<dep>-<plat>.tar.gz
-```
-
-解压得 `<dep>/<plat>/<arch>/{include,lib}`，APP 把 `include/` 加入头文件路径、把 `lib/` 静态库链接进 Native 库即可。APP 不参与任何第三方库编译。
-
----
-
-## 8. 当前已支持依赖
-
-| 依赖 | 版本 | 产物 tag | 工作流 | 平台 |
-|------|------|----------|--------|------|
-| FFmpeg | n7.1 | `ffmpeg-n7.1` | `build_ffmpeg.yml` | linux/windows/macos/android/ios |
-| Python | 3.12.7 | `python-3.12.7` | `build_python.yml` | linux/macos/windows/android/ios（Windows 用 embeddable 包，iOS 用 Python-Apple-support） |
-| miniz | 2.2.0 | `miniz-2.2.0` | `build_miniz.yml` | linux/windows/macos/android/ios |
-| stb_image | 2c980bb（固定提交） | `stb_image-2c980bb` | `build_stb_image.yml` | linux/windows/macos/android/ios |
-| sqlite | 3.46.1 | `sqlite-3460100` | `build_sqlite.yml` | linux/windows/macos/android/ios |
-
-> **miniz / stb_image 说明**：二者为无 autoconf 的简单 C 库，`build.sh` 直接编译为
-> `libminiz.a` / `libstb_image.a`。stb_image 在独立编译单元内定义
-> `STB_IMAGE_IMPLEMENTATION`，消费方只包含声明并链接该库。
-> miniz 的 `miniz_export.h` 由上游 amalgamate 生成、源码包不含，脚本会自动生成 stub。
-
-> **Python 特别说明**：产物为**可嵌入解释器**，结构为
-> `python/<plat>/<arch>/{include,lib}`，其中 `lib/` 内含
-> `libpython3.x.a`（静态解释器）与 `python3.x/`（标准库）。
-> 各平台构建方式不同，详见 **`dependencies/python/README.md`**：
-> - Linux / macOS / Android：autoconf 静态 `libpython3.12.a`
-> - Windows：官方 **embeddable 包** + 导入库（`build_windows.sh`）
-> - iOS：`pybee/Python-Apple-support`（`build_ios.sh`，产出 `Python.xcframework`）
-> Linux 原生已在本机验证可嵌入（C 程序静态链接 `libpython3.12.a` 成功运行 Python）。
-
-## 9. 触发 CI 与推送流程
-
-> 每个库的 workflow 通过推送形如 `<dep>-*` 的 **tag** 自动触发（也支持手动）。
-
-### 9.1 tag 命名规范
-
-| 依赖 | 产物 tag |
-|------|----------|
-| FFmpeg | `ffmpeg-n7.1` |
-| Python | `python-3.12.7` |
-| miniz | `miniz-2.2.0` |
-| stb_image | `stb_image-2c980bb` |
-| sqlite | `sqlite-3460100` |
-
-### 9.2 首次触发（打 tag 并推送）
+push `build-*` tag 或手动触发 `Build All Platforms`：
 
 ```bash
-# 在仓库根目录
-git tag <dep>-<version>          # 例：git tag python-3.12.7
-git push origin <dep>-<version>  # 例：git push origin python-3.12.7
+git tag build-1.0.0
+git push origin build-1.0.0
 ```
 
-推送后，对应 `.github/workflows/build_<dep>.yml` 自动运行：
-5 个平台 Job（linux/windows/macos/android/ios）→ `release` Job 汇总并发布到
-该 tag 的 GitHub Release（产物为 `<dep>-<plat>.tar.gz`）。
+修改后重新打 tag 到最新 commit 再推送即可触发重建。
 
-### 9.3 修改后重新构建（删除并重建 tag）
+---
 
-若改了代码想重跑，删除旧 tag 再打新 tag 推送即可（release 会被覆盖更新）：
+## 5. APP 端如何消费
 
-```bash
-git push origin :refs/tags/<dep>-<version>   # 删除远端 tag
-git tag -d <dep>-<version>                    # 删除本地 tag
-git tag <dep>-<version>                       # 重新打 tag（指向最新 commit）
-git push origin <dep>-<version>               # 触发 CI
-```
-
-> 注意：`git tag` 会固定在某次 commit。每次改动后都要重新打 tag 到最新 commit，
-> 否则 CI 用的还是旧代码。
-
-### 9.4 手动触发
-
-Actions → 选择 `Build <Dep> Static Libs` → **Run workflow**。
-
-### 9.5 查看结果与产物
-
-1. **进度**：仓库 `Actions` 页查看各平台 Job 是否通过。
-2. **Release**：构建全部通过后，`release` Job 把产物发布到对应 tag 的 Release
-   （`Releases` → `<dep>-<version>`）。
-3. **产物结构**：每个 `<dep>-<plat>.tar.gz` 解压后为 `<dep>/<plat>/<arch>/{include,lib}`。
-
-### 9.6 消费 Release
-
-APP 端按下述 URL 下载对应平台产物（见 §7）：
+APP 下载对应平台的 Release：
 
 ```text
-https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/<dep>-<version>/<dep>-<plat>.tar.gz
+https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/<platform>/<platform>.tar.gz
 ```
+
+解压得 `include/` + `lib/`，加入头文件路径并链接静态库；也可直接 vendor 进 APP 工程。

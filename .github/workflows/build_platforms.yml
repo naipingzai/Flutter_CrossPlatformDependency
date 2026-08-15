@@ -1,0 +1,184 @@
+# ============================================================
+# build_platforms.yml
+# 每个平台 Job 自包含编译 5 个库（ffmpeg/miniz/stb_image/sqlite/python）
+# 并合并为该平台 {include,lib}，打包上传；release Job（ubuntu）按平台
+# 分别创建 GitHub Release（linux/windows/macos/android/ios）。
+# 触发：手动 或 push build-* tag。
+# ============================================================
+name: Build All Platforms
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'build-*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ============================================================
+  # Linux x86_64
+  # ============================================================
+  linux:
+    name: Linux x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y nasm yasm make gcc g++ build-essential curl xz-utils
+      - name: Build
+        run: bash dependencies/linux/build.sh
+      - name: Package
+        run: |
+          cd "${RUNNER_TEMP}/deps-stage/linux/x86_64"
+          tar -czf "${RUNNER_TEMP}/linux.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libs-linux
+          path: ${{ runner.temp }}/linux.tar.gz
+          if-no-files-found: error
+
+  # ============================================================
+  # Windows x86_64（MSYS2/MinGW64）
+  # ============================================================
+  windows:
+    name: Windows x86_64
+    runs-on: windows-latest
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git make tar mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-xz mingw-w64-x86_64-pkg-config
+      - name: Build
+        run: bash dependencies/windows/build.sh
+      - name: Package
+        run: |
+          STAGE="$(cygpath -u "${RUNNER_TEMP}/deps-stage/windows/x86_64")"
+          OUT="$(cygpath -u "${RUNNER_TEMP}/windows.tar.gz")"
+          cd "${STAGE}" && tar -czf "${OUT}" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libs-windows
+          path: ${{ runner.temp }}/windows.tar.gz
+          if-no-files-found: error
+
+  # ============================================================
+  # macOS arm64
+  # ============================================================
+  macos:
+    name: macOS arm64
+    runs-on: macos-14
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          export CC="$(xcrun --sdk macosx --find clang)"
+          export SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          bash dependencies/macos/build.sh
+      - name: Package
+        run: |
+          cd "${RUNNER_TEMP}/deps-stage/macos/arm64"
+          tar -czf "${RUNNER_TEMP}/macos.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libs-macos
+          path: ${{ runner.temp }}/macos.tar.gz
+          if-no-files-found: error
+
+  # ============================================================
+  # Android arm64-v8a
+  # ============================================================
+  android:
+    name: Android arm64-v8a
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+          add-to-path: false
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y nasm yasm make gcc g++ build-essential curl xz-utils
+      - name: Build
+        env:
+          CC: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
+          AR: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+          SYSROOT: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+          EXTRA_CFLAGS: "-DANDROID -fPIC"
+          EXTRA_LDFLAGS: "-L${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21"
+        run: bash dependencies/android/build.sh
+      - name: Package
+        run: |
+          cd "${RUNNER_TEMP}/deps-stage/android/arm64-v8a"
+          tar -czf "${RUNNER_TEMP}/android.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libs-android
+          path: ${{ runner.temp }}/android.tar.gz
+          if-no-files-found: error
+
+  # ============================================================
+  # iOS arm64
+  # ============================================================
+  ios:
+    name: iOS arm64
+    runs-on: macos-14
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          export CC="$(xcrun --sdk iphoneos --find clang)"
+          export SYSROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
+          bash dependencies/ios/build.sh
+      - name: Package
+        run: |
+          cd "${RUNNER_TEMP}/deps-stage/ios/arm64"
+          tar -czf "${RUNNER_TEMP}/ios.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libs-ios
+          path: ${{ runner.temp }}/ios.tar.gz
+          if-no-files-found: error
+
+  # ============================================================
+  # Release：按平台创建 GitHub Release
+  # ============================================================
+  release:
+    name: Publish Releases (per-platform)
+    runs-on: ubuntu-24.04
+    needs: [linux, windows, macos, android, ios]
+    if: always()
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+      - name: Create per-platform Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for plat in linux windows macos android ios; do
+            f="release-assets/libs-${plat}/${plat}.tar.gz"
+            if [ -f "$f" ]; then
+              gh release delete "${plat}" --yes --cleanup-tag 2>/dev/null || true
+              gh release create "${plat}" --title "${plat} 预编译库" \
+                --notes "ffmpeg / miniz / stb_image / sqlite / python" "$f"
+              echo "${plat} 已发布"
+            else
+              echo "${plat} 无产物，跳过"
+            fi
+          done
