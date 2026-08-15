@@ -157,7 +157,7 @@ build_python() {
   "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" --prefix="$inst" \
     --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules \
     CFLAGS="$cflags" \
-    || { echo "==== [python] configure 失败，config.log 尾部 ===="; sed -n '1,60p' "${bd}/config.log" 2>/dev/null || true; echo "==== config.log 尾部 ===="; tail -40 "${bd}/config.log" 2>/dev/null || true; echo "==== config.log 结束 ===="; exit 1; }
+    || { echo "==== [python] configure 失败，完整 config.log ===="; cat "${bd}/config.log" 2>/dev/null || true; echo "==== config.log 结束 ===="; exit 1; }
   make -j"$(platform_jobs)"; make install
   stage_lib python
   local out="${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}"
