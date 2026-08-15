@@ -161,6 +161,12 @@ build_python() {
   # 交叉编译时 getaddrinfo 运行时测试无法执行，需关闭 IPv6
   cfg+=(--disable-ipv6)
   # 交叉编译时无法探测 /dev 设备文件，用 CONFIG_SITE 预置结果
+  # Android(bionic) 缺失部分外部库/头文件，禁用依赖它们的 stdlib C 模块：
+  #   grp/spwd       无组/影子密码数据库
+  #   _ctypes        libffi 头文件未配置进编译路径
+  #   ossaudiodev    OSS 音频设备在 Android 不可用
+  #   _lzma/_bz2    Android NDK sysroot 无 liblzma/libbz2 头文件
+  #   readline       Android 无 GNU readline
   local site="${SRC_ROOT}/config-${PLATFORM}.site"
   printf 'ac_cv_file__dev_ptmx=yes
 ac_cv_file__dev_ptc=no
@@ -168,6 +174,9 @@ py_cv_module_grp=n/a
 py_cv_module_spwd=n/a
 py_cv_module__ctypes=n/a
 py_cv_module_ossaudiodev=n/a
+py_cv_module__lzma=n/a
+py_cv_module__bz2=n/a
+py_cv_module_readline=n/a
 ' > "$site"
   export CONFIG_SITE="$site"
   cfg+=(--with-build-python="${BUILD_PYTHON}")
