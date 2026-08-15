@@ -143,7 +143,8 @@ build_sqlite() {
 
 
 build_python() {
-  local version=3.12.7 DEP_SRC_DIR=Python-${version}
+  local version=3.12.7
+  local DEP_SRC_DIR=Python-${version}
   dl_extract python "https://www.python.org/ftp/python/${version}/Python-${version}.tgz" "$DEP_SRC_DIR" "python.tgz"
   local src="${SRC_ROOT}/python/${DEP_SRC_DIR}" inst="${STAGE_ROOT}/python-inst"
   rm -rf "$inst"; mkdir -p "$inst/include/python3.12" "$inst/lib"
