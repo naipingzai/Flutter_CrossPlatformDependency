@@ -150,8 +150,8 @@ build_python() {
   rm -rf "$inst"; mkdir -p "$inst/include/python3.12" "$inst/lib"
   cp -a "${src}/Include/." "$inst/include/python3.12/"
   cp "${src}/PC/pyconfig.h" "$inst/include/python3.12/"
-  curl -fL --retry 3 -o "${SRC_ROOT}/python/emb.zip" "https://www.python.org/ftp/python/${version}/python-${version}-embed-amd64.zip" 2>/dev/null || { echo "!!! [python] 下载失败，跳过" >&2; return 0; }
-  unzip -q -o "${SRC_ROOT}/python/emb.zip" -d "$inst/lib" 2>/dev/null || { echo "!!! [python] 解压失败，跳过" >&2; return 0; }
+  curl -fL --retry 3 -o "${SRC_ROOT}/python/emb.zip" "https://www.python.org/ftp/python/${version}/python-${version}-embed-amd64.zip"
+  unzip -q -o "${SRC_ROOT}/python/emb.zip" -d "$inst/lib"
   local dll="$(ls "$inst"/lib/python3*.dll 2>/dev/null | head -1)"
   if [ -n "$dll" ]; then ( cd "$inst/lib" && gendef "$(basename "$dll")" && dlltool -d python312.def -l libpython312.a -D "$(basename "$dll")" && rm -f python312.def ); fi
   stage_lib python

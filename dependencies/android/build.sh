@@ -145,7 +145,6 @@ build_sqlite() {
 build_python() {
   local DEP_SRC_DIR=Python-3.12.7
   dl_extract python "https://www.python.org/ftp/python/3.12.7/Python-3.12.7.tgz" "$DEP_SRC_DIR" "python.tgz"
-  if [ -z "${BUILD_PYTHON:-}" ]; then echo "!!! [python] Android 需要 BUILD_PYTHON，跳过 python" >&2; return 0; fi
   local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
   local bd="${SRC_ROOT}/python/build"; mkdir -p "$bd" && cd "$bd"
   local site="${SRC_ROOT}/config-android.site"
@@ -158,7 +157,7 @@ py_cv_module_ossaudiodev=n/a
 ' > "$site"
   CONFIG_SITE="$site" "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" --prefix="$inst" \
     --host=aarch64-linux-android --build="$(uname -m)-linux-gnu" \
-    --with-build-python="${BUILD_PYTHON}" --without-ensurepip --disable-shared --disable-ipv6 --disable-test-modules 2>&1 || { echo "!!! [python] Android 编译失败，跳过" >&2; return 0; }
+    --with-build-python="${BUILD_PYTHON}" --without-ensurepip --disable-shared --disable-ipv6 --disable-test-modules
   make -j"$(platform_jobs)"; make install
   stage_lib python
   cp -a "$inst/include" "${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}/include"

@@ -144,11 +144,11 @@ build_sqlite() {
 
 build_python() {
   local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
-  curl -fL --retry 3 -o "${SRC_ROOT}/python-ios.tar.gz" "https://github.com/pybee/Python-Apple-support/releases/download/3.12-b4/Python-3.12-b4-iOS-support.b4.tar.gz" 2>/dev/null || { echo "!!! [python] iOS 下载失败，跳过" >&2; return 0; }
+  curl -fL --retry 3 -o "${SRC_ROOT}/python-ios.tar.gz" "https://github.com/pybee/Python-Apple-support/releases/download/3.12-b4/Python-3.12-b4-iOS-support.b4.tar.gz"
   rm -rf "${SRC_ROOT}/python-ios"; mkdir -p "${SRC_ROOT}/python-ios"
   tar -xzf "${SRC_ROOT}/python-ios.tar.gz" -C "${SRC_ROOT}/python-ios"
   local xcframe="$(find "${SRC_ROOT}/python-ios" -type d -name 'Python.xcframework' | head -1)"
-  if [ -z "$xcframe" ]; then echo "!!! [python] iOS 未找到 xcframework，跳过" >&2; return 0; fi
+  if [ -z "$xcframe" ]; then echo "[python] 未找到 Python.xcframework" >&2; return 1; fi
   local out="${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}"
   rm -rf "$out"; mkdir -p "$out"
   cp -a "$xcframe" "$out/Python.xcframework"

@@ -150,7 +150,7 @@ build_python() {
   export CC="$(xcrun --sdk macosx --find clang)"
   export CFLAGS="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
   "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" --prefix="$inst" \
-    --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules 2>&1 || { echo "!!! [python] 编译失败，跳过" >&2; return 0; }
+    --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules
   make -j"$(platform_jobs)"; make install
   stage_lib python
   cp -a "$inst/include" "${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}/include"

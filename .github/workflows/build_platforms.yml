@@ -31,6 +31,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install deps
         run: sudo apt-get update && sudo apt-get install -y nasm yasm make gcc g++ build-essential curl xz-utils
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Build
         run: bash dependencies/linux/build.sh
       - name: Package (per-lib)
@@ -91,6 +94,9 @@ jobs:
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Build
         run: |
           export CC="$(xcrun --sdk macosx --find clang)"
@@ -127,8 +133,12 @@ jobs:
           add-to-path: false
       - name: Install deps
         run: sudo apt-get update && sudo apt-get install -y nasm yasm make gcc g++ build-essential curl xz-utils
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Build
         env:
+          BUILD_PYTHON: "python3.12"
           CC: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
           AR: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
           SYSROOT: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
