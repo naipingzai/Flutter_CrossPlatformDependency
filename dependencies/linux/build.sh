@@ -173,6 +173,7 @@ stage_platform() {
   echo "[platform] 合并完成: ${out}"
 }
 
-build_ffmpeg; build_miniz; build_stb_image; build_sqlite; build_python
+build_ffmpeg; build_miniz; build_stb_image; build_sqlite
+( build_python ) || echo "[python] 构建失败，已跳过（不影响 4 个核心库）"
 stage_platform
 echo "[linux] 全部构建完成"
