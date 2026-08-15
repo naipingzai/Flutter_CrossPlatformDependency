@@ -17,7 +17,7 @@ permissions:
   contents: write
 
 env:
-  LIBS: "ffmpeg miniz stb_image sqlite python"
+  DEP_LIBS: "ffmpeg miniz stb_image sqlite python"
 
 jobs:
   # ============================================================
@@ -40,7 +40,7 @@ jobs:
         run: |
           mkdir -p "${RUNNER_TEMP}/pkgs"
           cd "${RUNNER_TEMP}/deps-stage"
-          for lib in ${{ env.LIBS }}; do
+          for lib in ${{ env.DEP_LIBS }}; do
             d="${lib}/linux/x86_64"
             if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/linux-${lib}.tar.gz" .); fi
           done
@@ -75,7 +75,7 @@ jobs:
         run: |
           mkdir -p "$(cygpath -u "${RUNNER_TEMP}")/pkgs"
           cd "$(cygpath -u "${RUNNER_TEMP}")/deps-stage"
-          for lib in ${{ env.LIBS }}; do
+          for lib in ${{ env.DEP_LIBS }}; do
             d="${lib}/windows/x86_64"
             if [ -d "$d" ]; then (cd "$d" && tar -czf "$(cygpath -u "${RUNNER_TEMP}")/pkgs/windows-${lib}.tar.gz" .); fi
           done
@@ -106,7 +106,7 @@ jobs:
         run: |
           mkdir -p "${RUNNER_TEMP}/pkgs"
           cd "${RUNNER_TEMP}/deps-stage"
-          for lib in ${{ env.LIBS }}; do
+          for lib in ${{ env.DEP_LIBS }}; do
             d="${lib}/macos/arm64"
             if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/macos-${lib}.tar.gz" .); fi
           done
@@ -155,7 +155,7 @@ jobs:
         run: |
           mkdir -p "${RUNNER_TEMP}/pkgs"
           cd "${RUNNER_TEMP}/deps-stage"
-          for lib in ${{ env.LIBS }}; do
+          for lib in ${{ env.DEP_LIBS }}; do
             d="${lib}/android/arm64-v8a"
             if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/android-${lib}.tar.gz" .); fi
           done
@@ -183,7 +183,7 @@ jobs:
         run: |
           mkdir -p "${RUNNER_TEMP}/pkgs"
           cd "${RUNNER_TEMP}/deps-stage"
-          for lib in ${{ env.LIBS }}; do
+          for lib in ${{ env.DEP_LIBS }}; do
             d="${lib}/ios/arm64"
             if [ -d "$d" ]; then (cd "$d" && tar -czf "${RUNNER_TEMP}/pkgs/ios-${lib}.tar.gz" .); fi
           done
