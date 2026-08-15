@@ -142,16 +142,16 @@ build_sqlite() {
 }
 
 
+
 build_python() {
-  local version=3.12.7
-  local DEP_SRC_DIR=cpython-3.12.7
-  dl_extract python "https://github.com/python/cpython/archive/refs/tags/v3.12.7.tar.gz" "$DEP_SRC_DIR" "cpython.tar.gz"
+  local version=3.12.7 DEP_SRC_DIR=Python-${version}
+  dl_extract python "https://www.python.org/ftp/python/${version}/Python-${version}.tgz" "$DEP_SRC_DIR" "Python.tgz"
   local src="${SRC_ROOT}/python/${DEP_SRC_DIR}" inst="${STAGE_ROOT}/python-inst"
   rm -rf "$inst"; mkdir -p "$inst/include/python3.12" "$inst/lib"
   cp -a "${src}/Include/." "$inst/include/python3.12/"
   cp "${src}/PC/pyconfig.h" "$inst/include/python3.12/"
-  curl -fL --retry 3 -o "${SRC_ROOT}/python/emb.zip" "https://www.python.org/ftp/python/${version}/python-${version}-embed-amd64.zip"
-  unzip -q -o "${SRC_ROOT}/python/emb.zip" -d "$inst/lib"
+  curl -fL --retry 5 --retry-all-errors -o "${SRC_ROOT}/python/embed.zip" "https://www.python.org/ftp/python/${version}/python-${version}-embed-amd64.zip"
+  unzip -q -o "${SRC_ROOT}/python/embed.zip" -d "$inst/lib"
   local dll="$(ls "$inst"/lib/python3*.dll 2>/dev/null | head -1)"
   if [ -n "$dll" ]; then ( cd "$inst/lib" && gendef "$(basename "$dll")" && dlltool -d python312.def -l libpython312.a -D "$(basename "$dll")" && rm -f python312.def ); fi
   stage_lib python

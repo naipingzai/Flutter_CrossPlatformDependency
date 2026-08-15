@@ -138,14 +138,13 @@ build_sqlite() {
 # ============================================================
 # python（autoconf 原生）—— 照抄 dependencies/python/build.sh
 # ============================================================
+
 build_python() {
-  local DEP_SRC_DIR=cpython-3.12.7
-  dl_extract python "https://github.com/python/cpython/archive/refs/tags/v3.12.7.tar.gz" "$DEP_SRC_DIR" "cpython.tar.gz"
+  local DEP_SRC_DIR=Python-3.12.7 DEP_TARBALL=Python-3.12.7.tgz
+  dl_extract python "https://www.python.org/ftp/python/3.12.7/${DEP_TARBALL}" "$DEP_SRC_DIR" "$DEP_TARBALL"
   local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
-  local sdir="${SRC_ROOT}/python/${DEP_SRC_DIR}"
-  cd "$sdir"
-  export CC="${CC:-cc}"
-  ./configure --prefix="$inst" \
+  local bd="${SRC_ROOT}/python/build-${PLATFORM}-${ARCH}"; mkdir -p "$bd" && cd "$bd"
+  "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" --prefix="$inst" \
     --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules
   make -j"$(platform_jobs)"; make install
   stage_lib python

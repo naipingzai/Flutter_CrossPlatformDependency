@@ -139,6 +139,7 @@ jobs:
       - name: Build
         env:
           BUILD_PYTHON: "python3.12"
+          HOST_TRIPLE: "aarch64-linux-android"
           CC: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
           AR: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
           SYSROOT: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
