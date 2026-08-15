@@ -156,9 +156,13 @@ build_python() {
   local dll="$(ls "$inst"/lib/python3*.dll 2>/dev/null | head -1)"
   if [ -n "$dll" ]; then ( cd "$inst/lib" && gendef "$(basename "$dll")" && dlltool -d python312.def -l libpython312.a -D "$(basename "$dll")" && rm -f python312.def ); fi
   stage_lib python
-  cp -a "$inst/include" "${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}/include"
-  cp -a "$inst/lib" "${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}/lib"
-  echo "[python] 完成"
+  local out="${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}"
+  cp -a "$inst/include" "$out/include"
+  cp -a "$inst/lib" "$out/lib"
+  # 严格检查：运行时 DLL + 头文件必须真实存在，否则视为构建失败
+  [ -f "$out/include/python3.12/Python.h" ] || { echo "[python] 错误：未生成 Python.h" >&2; exit 1; }
+  [ -n "$(ls "$out"/lib/python3*.dll 2>/dev/null)" ] || { echo "[python] 错误：未生成 python3*.dll" >&2; exit 1; }
+  echo "[python] 完成（已通过严格检查）"
 }
 
 # ============================================================

@@ -157,7 +157,12 @@ build_python() {
   local slice="$(find "$xcframe" -type d -path '*ios-arm64*' | head -1)"
   [ -d "$slice/include" ] && cp -a "$slice/include" "$out/include"
   [ -d "$slice/lib" ] && cp -a "$slice/lib" "$out/lib"
-  echo "[python] 完成（iOS xcframework）"
+  # 严格检查：xcframework + 头文件必须真实存在，否则视为构建失败
+  [ -d "$out/Python.xcframework" ] || { echo "[python] 错误：未生成 Python.xcframework" >&2; exit 1; }
+  if [ ! -f "$out/include/python3.12/Python.h" ] && [ ! -f "$out/include/Python.h" ]; then
+    echo "[python] 错误：未生成 Python.h" >&2; exit 1
+  fi
+  echo "[python] 完成（iOS xcframework，已通过严格检查）"
 }
 
 # ============================================================

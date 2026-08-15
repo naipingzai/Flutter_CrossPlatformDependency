@@ -144,14 +144,18 @@ build_python() {
   local DEP_SRC_DIR=cpython-3.12.7
   dl_extract python "https://github.com/python/cpython/archive/refs/tags/v3.12.7.tar.gz" "$DEP_SRC_DIR" "cpython.tar.gz"
   local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
-  local bd="${SRC_ROOT}/python/build-${PLATFORM}-${ARCH}"; mkdir -p "$bd" && cd "$bd"
+  local bd="${SRC_ROOT}/python/build-${PLATFORM}-${ARCH}"; rm -rf "$bd"; mkdir -p "$bd" && cd "$bd"
   "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" --prefix="$inst" \
     --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules
   make -j"$(platform_jobs)"; make install
   stage_lib python
-  cp -a "$inst/include" "${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}/include"
-  cp -a "$inst/lib" "${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}/lib"
-  echo "[python] 完成"
+  local out="${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}"
+  cp -a "$inst/include" "$out/include"
+  cp -a "$inst/lib" "$out/lib"
+  # 严格检查：静态库 + 头文件必须真实存在，否则视为构建失败
+  [ -f "$out/lib/libpython3.12.a" ] || { echo "[python] 错误：未生成 libpython3.12.a" >&2; exit 1; }
+  [ -f "$out/include/python3.12/Python.h" ] || { echo "[python] 错误：未生成 Python.h" >&2; exit 1; }
+  echo "[python] 完成（已通过严格检查）"
 }
 
 # ============================================================

@@ -148,10 +148,19 @@ build_python() {
   local DEP_SRC_DIR=cpython-3.12.7
   dl_extract python "https://github.com/python/cpython/archive/refs/tags/v3.12.7.tar.gz" "$DEP_SRC_DIR" "cpython.tar.gz"
   local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
-  local bd="${SRC_ROOT}/python/build-${PLATFORM}-${ARCH}"; mkdir -p "$bd" && cd "$bd"
+  local bd="${SRC_ROOT}/python/build-${PLATFORM}-${ARCH}"; rm -rf "$bd"; mkdir -p "$bd" && cd "$bd"
   local cfg=(--prefix="$inst" --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules)
+  # 交叉编译：HOST_TRIPLE / BUILD_PYTHON 必须由 workflow 注入，否则明确报错
+  if [ -z "${HOST_TRIPLE:-}" ]; then
+    echo "[python] 错误：Android 交叉编译需要 HOST_TRIPLE" >&2; exit 1
+  fi
+  if [ -z "${BUILD_PYTHON:-}" ]; then
+    echo "[python] 错误：Android 交叉编译需要 BUILD_PYTHON（与目标同版本的主机 python）" >&2; exit 1
+  fi
   cfg+=(--host="${HOST_TRIPLE}" --build="${BUILD_TRIPLE:-$(uname -m)-linux-gnu}")
+  # 交叉编译时 getaddrinfo 运行时测试无法执行，需关闭 IPv6
   cfg+=(--disable-ipv6)
+  # 交叉编译时无法探测 /dev 设备文件，用 CONFIG_SITE 预置结果
   local site="${SRC_ROOT}/config-${PLATFORM}.site"
   printf 'ac_cv_file__dev_ptmx=yes
 ac_cv_file__dev_ptc=no
@@ -161,18 +170,23 @@ py_cv_module__ctypes=n/a
 py_cv_module_ossaudiodev=n/a
 ' > "$site"
   export CONFIG_SITE="$site"
+  cfg+=(--with-build-python="${BUILD_PYTHON}")
   [ -n "${CC:-}" ] && export CC; [ -n "${CXX:-}" ] && export CXX
   [ -n "${AR:-}" ] && export AR; [ -n "${RANLIB:-}" ] && export RANLIB; [ -n "${STRIP:-}" ] && export STRIP
   [ -n "${SYSROOT:-}" ] && export CFLAGS="${CFLAGS:-} --sysroot=${SYSROOT}"
   [ -n "${EXTRA_CFLAGS:-}" ] && export CFLAGS="${CFLAGS:-} ${EXTRA_CFLAGS}"
   [ -n "${EXTRA_LDFLAGS:-}" ] && export LDFLAGS="${LDFLAGS:-} ${EXTRA_LDFLAGS}"
-  cfg+=(--with-build-python="${BUILD_PYTHON}")
+  echo "[python] configure: ${cfg[*]}"
   "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" "${cfg[@]}"
   make -j"$(platform_jobs)"; make install
   stage_lib python
-  cp -a "$inst/include" "${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}/include"
-  cp -a "$inst/lib" "${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}/lib"
-  echo "[python] 完成"
+  local out="${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}"
+  cp -a "$inst/include" "$out/include"
+  cp -a "$inst/lib" "$out/lib"
+  # 严格检查：静态库 + 头文件必须真实存在，否则视为构建失败
+  [ -f "$out/lib/libpython3.12.a" ] || { echo "[python] 错误：未生成 libpython3.12.a" >&2; exit 1; }
+  [ -f "$out/include/python3.12/Python.h" ] || { echo "[python] 错误：未生成 Python.h" >&2; exit 1; }
+  echo "[python] 完成（已通过严格检查）"
 }
 
 # ============================================================
