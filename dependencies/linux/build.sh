@@ -139,8 +139,8 @@ build_sqlite() {
 # python（autoconf 原生）—— 照抄 dependencies/python/build.sh
 # ============================================================
 build_python() {
-  local DEP_SRC_DIR=Python-3.12.7
-  dl_extract python "https://www.python.org/ftp/python/3.12.7/Python-3.12.7.tgz" "$DEP_SRC_DIR" "python.tgz"
+  local DEP_SRC_DIR=cpython-3.12.7
+  dl_extract python "https://github.com/python/cpython/archive/refs/tags/v3.12.7.tar.gz" "$DEP_SRC_DIR" "cpython.tar.gz"
   local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
   local bd="${SRC_ROOT}/python/build"; mkdir -p "$bd" && cd "$bd"
   export CC="${CC:-cc}"
