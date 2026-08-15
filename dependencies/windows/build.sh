@@ -3,6 +3,7 @@
 # WINDOWS —— 自包含构建：ffmpeg / miniz / stb_image / sqlite / python
 # ============================================================
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 export PLATFORM=windows ARCH=x86_64 ARCH_DIR=x86_64
 export SRC_ROOT="${SRC_ROOT:-${RUNNER_TEMP:-/tmp}/deps-src}"
@@ -144,7 +145,7 @@ build_sqlite() {
 
 
 build_python() {
-  bash "$(dirname "${BASH_SOURCE[0]}")/../python/build_windows.sh"
+  bash "${SCRIPT_DIR}/../python/build_windows.sh"
 }
 
 # ============================================================

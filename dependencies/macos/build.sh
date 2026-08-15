@@ -3,6 +3,7 @@
 # MACOS —— 自包含构建：ffmpeg / miniz / stb_image / sqlite / python
 # ============================================================
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 export PLATFORM=macos ARCH=arm64 ARCH_DIR=arm64
 export SRC_ROOT="${SRC_ROOT:-${RUNNER_TEMP:-/tmp}/deps-src}"
@@ -146,7 +147,7 @@ build_sqlite() {
 build_python() {
   unset CC CFLAGS
   export DEP_SOURCE_ROOT="${SRC_ROOT}" DEP_STAGE_ROOT="${STAGE_ROOT}"
-  bash "$(dirname "${BASH_SOURCE[0]}")/../python/build.sh"
+  bash "${SCRIPT_DIR}/../python/build.sh"
 }
 
 # ============================================================

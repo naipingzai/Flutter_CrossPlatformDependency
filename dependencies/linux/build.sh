@@ -4,6 +4,7 @@
 # 各库构建函数照抄自 per-tool 已验证脚本（规则 A-E），仅做平台编排与合并。
 # ============================================================
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 export PLATFORM=linux ARCH=x86_64 ARCH_DIR=x86_64
 export SRC_ROOT="${SRC_ROOT:-${RUNNER_TEMP:-/tmp}/deps-src}"
@@ -141,7 +142,7 @@ build_sqlite() {
 
 build_python() {
   export DEP_SOURCE_ROOT="${SRC_ROOT}" DEP_STAGE_ROOT="${STAGE_ROOT}"
-  bash "$(dirname "${BASH_SOURCE[0]}")/../python/build.sh"
+  bash "${SCRIPT_DIR}/../python/build.sh"
 }
 
 # ============================================================
