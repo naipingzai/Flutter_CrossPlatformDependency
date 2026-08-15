@@ -144,33 +144,8 @@ build_sqlite() {
 
 
 build_python() {
-  local DEP_SRC_DIR=cpython-3.12.7
-  dl_extract python "https://github.com/python/cpython/archive/refs/tags/v3.12.7.tar.gz" "$DEP_SRC_DIR" "cpython.tar.gz"
-  local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
-  local bd="${SRC_ROOT}/python/build-${PLATFORM}-${ARCH}"; mkdir -p "$bd" && cd "$bd"
-  local cfg=(--prefix="$inst" --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules)
-  cfg+=(--host="${HOST_TRIPLE}" --build="$(uname -m)-linux-gnu")
-  cfg+=(--disable-ipv6)
-  local site="${SRC_ROOT}/config-${PLATFORM}.site"
-  printf 'ac_cv_file__dev_ptmx=yes
-ac_cv_file__dev_ptc=no
-py_cv_module_grp=n/a
-py_cv_module_spwd=n/a
-py_cv_module__ctypes=n/a
-py_cv_module_ossaudiodev=n/a
-' > "$site"
-  export CONFIG_SITE="$site"
-  [ -n "${CC:-}" ] && export CC
-  [ -n "${SYSROOT:-}" ] && export CFLAGS="--sysroot=${SYSROOT}"
-  [ -n "${EXTRA_CFLAGS:-}" ] && export CFLAGS="${CFLAGS:-} ${EXTRA_CFLAGS}"
-  [ -n "${EXTRA_LDFLAGS:-}" ] && export LDFLAGS="${EXTRA_LDFLAGS}"
-  cfg+=(--with-build-python="${BUILD_PYTHON}")
-  "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" "${cfg[@]}" 2>&1 || { echo "!!! [python] Android 交叉编译失败（跳过，保留 ffmpeg/miniz/stb_image/sqlite）" >&2; return 0; }
-  make -j"$(platform_jobs)"; make install
-  stage_lib python
-  cp -a "$inst/include" "${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}/include"
-  cp -a "$inst/lib" "${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}/lib"
-  echo "[python] 完成"
+  export DEP_SOURCE_ROOT="${SRC_ROOT}" DEP_STAGE_ROOT="${STAGE_ROOT}"
+  bash "$(dirname "${BASH_SOURCE[0]}")/../python/build.sh"
 }
 
 # ============================================================

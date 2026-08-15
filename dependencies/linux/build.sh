@@ -140,17 +140,8 @@ build_sqlite() {
 # ============================================================
 
 build_python() {
-  local DEP_SRC_DIR=cpython-3.12.7
-  dl_extract python "https://github.com/python/cpython/archive/refs/tags/v3.12.7.tar.gz" "$DEP_SRC_DIR" "cpython.tar.gz"
-  local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
-  local bd="${SRC_ROOT}/python/build-${PLATFORM}-${ARCH}"; mkdir -p "$bd" && cd "$bd"
-  "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" --prefix="$inst" \
-    --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules
-  make -j"$(platform_jobs)"; make install
-  stage_lib python
-  cp -a "$inst/include" "${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}/include"
-  cp -a "$inst/lib" "${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}/lib"
-  echo "[python] 完成"
+  export DEP_SOURCE_ROOT="${SRC_ROOT}" DEP_STAGE_ROOT="${STAGE_ROOT}"
+  bash "$(dirname "${BASH_SOURCE[0]}")/../python/build.sh"
 }
 
 # ============================================================

@@ -134,14 +134,19 @@ jobs:
       - name: Install deps
         run: sudo apt-get update && sudo apt-get install -y nasm yasm make gcc g++ build-essential curl xz-utils zlib1g-dev libssl-dev libffi-dev libreadline-dev libsqlite3-dev libbz2-dev liblzma-dev libncurses-dev libgdbm-dev
       - uses: actions/setup-python@v5
+        id: hostpy
         with:
           python-version: '3.12'
       - name: Build
         env:
-          BUILD_PYTHON: "python3.12"
+          BUILD_PYTHON: ${{ steps.hostpy.outputs.python-path }}
           HOST_TRIPLE: "aarch64-linux-android"
+          BUILD_TRIPLE: "x86_64-linux-gnu"
           CC: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
+          CXX: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang++"
           AR: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+          RANLIB: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib"
+          STRIP: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           SYSROOT: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
           EXTRA_CFLAGS: "-DANDROID -fPIC"
           EXTRA_LDFLAGS: "-L${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21"
