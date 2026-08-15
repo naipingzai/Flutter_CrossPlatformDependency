@@ -3,6 +3,40 @@
 > 第三方原生 C/C++ 库的**跨平台静态编译**仓库。
 > 只负责「获取源码 → 编译 → 发布产物」，不参与任何 APP 业务逻辑。
 
+## 0. 背景：为什么是「静态库」，各平台对原生代码形态的支持
+
+本仓库把第三方库统一编译为**静态库 `.a`**，因为这是唯一能在 5 个平台统一交付
+且被 iOS 强制要求的形式。各平台对原生代码的加载方式差异如下：
+
+| 平台 | 原生代码如何进入 APP | Dart/运行时如何找到它 | 是否需要 PIC | FFmpeg 形态 |
+|------|---------------------|----------------------|:---:|:---:|
+| Linux | 静态链接进**可执行文件** (Flutter runner) | `DynamicLibrary.process()` 查进程符号表 | 否 | 静态 `.a` |
+| Windows | 静态链接进 **.exe** | `DynamicLibrary.process()` | 否 | 静态 `.a` |
+| macOS | 静态链接进**可执行文件** | `DynamicLibrary.process()` | 否 | 静态 `.a` |
+| Android | 打包进共享库壳 **`libfileops.so`** | `DynamicLibrary.open('libfileops.so')` | **是（强制）** | 静态 `.a` |
+| iOS | 静态链接进 **Mach-O** | `DynamicLibrary.process()` | 否 | 静态 `.a` |
+
+### 关键差异说明
+
+1. **iOS 强制静态库**：App Store 禁止运行时加载第三方动态库，原生代码必须
+   静态链接进最终 Mach-O。→ FFmpeg 只能编 `.a`。
+2. **Android 的 `.so` 壳 + PIC**：Android 无可执行文件，原生代码必须打包成
+   共享库 `libfileops.so`（Dart 通过 `DynamicLibrary.open` 加载）。**共享库在
+   ARM64 上强制要求所有代码为位置无关（PIC）**。若静态库缺 `-fPIC`，链接时会报：
+   ```
+   relocation R_AARCH64_ADR_PREL_PG_HI21 cannot be used against symbol ...
+   recompile with -fPIC
+   ```
+   因此 **Android 的 FFmpeg 必须带 `-fPIC`**（已通过 `--enable-pic` + workflow
+   注入 `-fPIC` 保证，并在脚本末尾做 PIC 校验，非 PIC 直接构建失败）。
+3. **桌面/iOS 无需 PIC**：静态链接进可执行文件/Mach-O 不要求 PIC，这也是同一套
+   FFmpeg 源码在 Linux 能过、Android 却报错的原因。
+4. **结论**：跨平台的"麻烦"主要来自 Android 的 `.so` 壳与 PIC 要求，以及 iOS 的
+   静态链接强制——这是移动多平台 + 大型原生库的固有成本，与前端框架（Flutter）
+   无关。本仓库用「一套静态库 + 每平台自包含脚本」把这份成本收敛到最标准形态。
+
+---
+
 ## 工程描述
 
 本仓库把 APP 需要的第三方原生库（ffmpeg / miniz / stb_image / sqlite / python）

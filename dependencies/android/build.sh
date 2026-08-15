@@ -1,10 +1,31 @@
 #!/usr/bin/env bash
 # ============================================================
 # ANDROID —— 自包含构建：ffmpeg / miniz / stb_image / sqlite / python
+# 目标：Android arm64-v8a（API 21+，NDK 交叉编译）
+#
+# 背景说明（务必阅读）：
+#   本仓库把 FFmpeg 等第三方库编译为「静态库 .a」。APP（Flutter_FileManager）
+#   在 Android 上通过 DynamicLibrary.open('libfileops.so') 加载原生代码，
+#   因此会把 libnative.a（含 FFmpeg）打包进一个共享库壳 libfileops.so。
+#   共享库（.so）在 ARM64 上强制要求所有代码为位置无关（PIC），
+#   所以 Android 的 FFmpeg 静态库必须带 -fPIC，否则链接 .so 时报
+#   "R_AARCH64_ADR_PREL_PG_HI21 ... recompile with -fPIC"。
+#
+#   这正是 Android 与桌面（Linux/macOS/Windows 直接静态链接进可执行文件、
+#   无需 PIC）的关键差异。iOS 同样静态链接，但由 Apple 签名打包，无需本脚本干预。
 # ============================================================
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# ---- 必配环境变量（由 .github/workflows/build_platforms.yml 的 android Job 注入）----
+# PLATFORM  目标平台标识（本文件固定为 android，勿改）
+# ARCH      目标 CPU 架构（本文件固定为 aarch64，勿改）
+# ARCH_DIR  产物目录名（本文件固定为 arm64-v8a，勿改）
+# CC        交叉编译器，如 $NDK/.../bin/aarch64-linux-android21-clang（必填）
+# AR        归档器，如 $NDK/.../bin/llvm-ar（必填）
+# SYSROOT   NDK sysroot，如 $NDK/.../toolchains/.../sysroot（可选）
+# EXTRA_CFLAGS  追加 CFLAGS，如 "-DANDROID -fPIC"（可选，务必含 -fPIC）
+# EXTRA_LDFLAGS 追加 LDFLAGS（可选）
 export PLATFORM=android ARCH=aarch64 ARCH_DIR=arm64-v8a
 export SRC_ROOT="${SRC_ROOT:-${RUNNER_TEMP:-/tmp}/deps-src}"
 export STAGE_ROOT="${STAGE_ROOT:-${RUNNER_TEMP:-/tmp}/deps-stage}"
@@ -43,26 +64,41 @@ platform_needs_cross() { case "$PLATFORM" in macos|android|ios) echo 1;; *) echo
 stage_lib() { local lib="$1"; local out="${STAGE_ROOT}/${lib}/${PLATFORM}/${ARCH_DIR}"; rm -rf "$out"; mkdir -p "$out"; }
 
 # ============================================================
-# ffmpeg（autoconf）—— 照抄 dependencies/ffmpeg/build.sh
+# ffmpeg（autoconf）
+# 产物：libavformat.a libavcodec.a libavutil.a libswscale.a libswresample.a
+# ------------------------------------------------------------
+# 可调配置项：
+#   DEP_SRC_DIR            FFmpeg 源码目录名（版本 tag 对应）
+#   DEP_CONFIGURE_FLAGS    减裁开关：去掉网络/设备/编码器/滤镜/封装器等，
+#                          + --enable-pic（Android 必须，见头部说明）
+#   url                    源码下载地址（版本 tag 需与 DEP_SRC_DIR 一致）
+# 若换 FFmpeg 版本：同步改 DEP_SRC_DIR、url、以及 APP 侧头文件即可。
 # ============================================================
 build_ffmpeg() {
-  local DEP_NAME=ffmpeg DEP_SRC_DIR=FFmpeg-n7.1 DEP_CONFIGURE_FLAGS="--disable-network --disable-avdevice --disable-postproc --disable-encoders --disable-filters --disable-muxers --disable-bsfs --disable-indevs --disable-outdevs --enable-pic"
+  # 版本 7.1（tag n7.1）
+  local DEP_SRC_DIR=FFmpeg-n7.1
+  local DEP_CONFIGURE_FLAGS="--disable-network --disable-avdevice --disable-postproc --disable-encoders --disable-filters --disable-muxers --disable-bsfs --disable-indevs --disable-outdevs --enable-pic"
   dl_extract ffmpeg "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n7.1.tar.gz" "$DEP_SRC_DIR" "ffmpeg.tar.gz"
   local target_os cross
   target_os="$(platform_target_os)"; cross="$(platform_needs_cross)"
   local inst="${STAGE_ROOT}/ffmpeg-inst"; rm -rf "$inst"
   local bd="${SRC_ROOT}/ffmpeg/build"; mkdir -p "$bd" && cd "$bd"
   local cfg=()
+  # 静态库、裁剪掉命令行工具/文档/调试符号
   cfg+=(--prefix="$inst"); cfg+=(--enable-static --disable-shared)
   cfg+=(--disable-programs --disable-doc --disable-debug); cfg+=($DEP_CONFIGURE_FLAGS)
+  # 目标架构 / 目标 OS / 交叉编译（android 需要）
   cfg+=(--arch="${ARCH}" --target-os="${target_os}")
   if [ "$cross" = "1" ]; then cfg+=(--enable-cross-compile); fi
+  # 工具链：编译器 / C++ / 交叉前缀 / sysroot
   if [ -n "${CC:-}" ]; then cfg+=(--cc="${CC}"); fi
   if [ -n "${CXX:-}" ]; then cfg+=(--cxx="${CXX}"); fi
   if [ -n "${CROSS_PREFIX:-}" ]; then cfg+=(--cross-prefix="${CROSS_PREFIX}"); fi
   if [ -n "${SYSROOT:-}" ]; then cfg+=(--sysroot="${SYSROOT}"); fi
+  # 追加编译/链接参数（EXTRA_CFLAGS 必须含 -fPIC，见 workflow 注入）
   if [ -n "${EXTRA_CFLAGS:-}" ]; then cfg+=(--extra-cflags="${EXTRA_CFLAGS}"); fi
   if [ -n "${EXTRA_LDFLAGS:-}" ]; then cfg+=(--extra-ldflags="${EXTRA_LDFLAGS}"); fi
+  # iOS 无汇编加速需要，Android 保留 asm（neon）
   if [ "$PLATFORM" = "ios" ]; then cfg+=(--disable-asm); fi
   # Android 静态库会被链接进共享库 libfileops.so，必须生成 PIC。
   # --enable-pic 已含于 DEP_CONFIGURE_FLAGS，且 workflow 已传 EXTRA_CFLAGS="-DANDROID -fPIC"，
