@@ -22,7 +22,14 @@ dl_extract() { # $1=dep $2=url $3=src_dir $4=tarball
   if [ -d "${root}/${src_dir}" ]; then echo "[${dep}] 源码已存在"; return; fi
   mkdir -p "${root}"
   curl -fL --retry 5 --retry-delay 3 --retry-all-errors -o "${root}/${tarball}" "${url}"
-  tar -xzf "${root}/${tarball}" -C "${root}"
+  # Windows(MSYS) 下把 Windows 路径转 unix 给 tar
+  local t p
+  if command -v cygpath >/dev/null 2>&1; then
+    t="$(cygpath -u "${root}/${tarball}")"; p="$(cygpath -u "${root}")"
+  else
+    t="${root}/${tarball}"; p="${root}"
+  fi
+  tar -xzf "$t" -C "$p"
   echo "[${dep}] 就绪: ${root}/${src_dir}"
 }
 platform_cc()  { echo "${CC:-cc}"; }
