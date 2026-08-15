@@ -156,7 +156,7 @@ build_python() {
   local dll="$(ls "$inst"/lib/python3*.dll 2>/dev/null | head -1)"
   if [ -n "$dll" ]; then
     if command -v gendef >/dev/null 2>&1 && command -v dlltool >/dev/null 2>&1; then
-      ( cd "$inst/lib" && gendef "$(basename "$dll")" && dlltool -d python312.def -l libpython312.a -D "$(basename "$dll")" && rm -f python312.def )
+      ( cd "$inst/lib" && gendef "$(basename "$dll")" && dlltool -d python312.def -l libpython312.a -D "$(basename "$dll")" && rm -f python312.def ) || echo "[python] 警告：导入库生成失败（不影响 DLL + 头文件）"
     else
       echo "[python] 警告：无 gendef/dlltool，跳过导入库生成（DLL + 头文件已产出）"
     fi
