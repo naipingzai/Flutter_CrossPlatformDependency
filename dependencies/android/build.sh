@@ -178,8 +178,11 @@ py_cv_module_ossaudiodev=n/a
   [ -n "${EXTRA_LDFLAGS:-}" ] && export LDFLAGS="${LDFLAGS:-} ${EXTRA_LDFLAGS}"
   echo "[python] configure: ${cfg[*]}"
   if ! "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" "${cfg[@]}"; then
-    echo "[python] configure 失败，config.log 尾部：" >&2
-    tail -40 "${bd}/config.log" 2>/dev/null >&2 || true
+    echo "==== [python] configure 失败，config.log 尾部 ===="
+    sed -n '1,60p' "${bd}/config.log" 2>/dev/null || true
+    echo "==== config.log 尾部 ===="
+    tail -40 "${bd}/config.log" 2>/dev/null || true
+    echo "==== config.log 结束 ===="
     exit 1
   fi
   make -j"$(platform_jobs)"; make install

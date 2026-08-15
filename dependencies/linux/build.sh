@@ -147,7 +147,7 @@ build_python() {
   local bd="${SRC_ROOT}/python/build-${PLATFORM}-${ARCH}"; rm -rf "$bd"; mkdir -p "$bd" && cd "$bd"
   "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" --prefix="$inst" \
     --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules \
-    || { echo "[python] configure 失败，config.log 尾部：" >&2; tail -40 "${bd}/config.log" 2>/dev/null >&2 || true; exit 1; }
+    || { echo "==== [python] configure 失败，config.log 尾部 ===="; sed -n '1,60p' "${bd}/config.log" 2>/dev/null || true; echo "==== config.log 尾部 ===="; tail -40 "${bd}/config.log" 2>/dev/null || true; echo "==== config.log 结束 ===="; exit 1; }
   make -j"$(platform_jobs)"; make install
   stage_lib python
   local out="${STAGE_ROOT}/python/${PLATFORM}/${ARCH_DIR}"
