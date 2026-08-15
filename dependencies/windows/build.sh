@@ -7,7 +7,7 @@ set -euo pipefail
 export PLATFORM=windows ARCH=x86_64 ARCH_DIR=x86_64
 export SRC_ROOT="${SRC_ROOT:-${RUNNER_TEMP:-/tmp}/deps-src}"
 export STAGE_ROOT="${STAGE_ROOT:-${RUNNER_TEMP:-/tmp}/deps-stage}"
-CC="${CC:-x86_64-w64-mingw32-gcc}"; AR="${AR:-x86_64-w64-mingw32-ar}"; export CC AR
+CC="${CC:-x86_64-w64-mingw32-gcc}"; AR="${AR:-ar}"; export CC AR
 # 各库构建函数照抄自 per-tool 已验证脚本（规则 A-E），仅做平台编排与合并。
 # ============================================================
 set -euo pipefail
