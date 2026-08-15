@@ -146,7 +146,8 @@ build_python() {
   local DEP_SRC_DIR=cpython-3.12.7
   dl_extract python "https://github.com/python/cpython/archive/refs/tags/v3.12.7.tar.gz" "$DEP_SRC_DIR" "cpython.tar.gz"
   local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
-  local bd="${SRC_ROOT}/python/build"; mkdir -p "$bd" && cd "$bd"
+  local sdir="${SRC_ROOT}/python/${DEP_SRC_DIR}"
+  cd "$sdir"
   local site="${SRC_ROOT}/config-android.site"
   printf 'ac_cv_file__dev_ptmx=yes
 ac_cv_file__dev_ptc=no

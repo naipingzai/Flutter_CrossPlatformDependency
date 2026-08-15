@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y nasm yasm make gcc g++ build-essential curl xz-utils
+        run: sudo apt-get update && sudo apt-get install -y nasm yasm make gcc g++ build-essential curl xz-utils zlib1g-dev libssl-dev libffi-dev libreadline-dev libsqlite3-dev libbz2-dev liblzma-dev libncurses-dev libgdbm-dev
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -67,8 +67,8 @@ jobs:
           msystem: MINGW64
           update: true
           install: >-
-            git make tar mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm
-            mingw-w64-x86_64-xz mingw-w64-x86_64-pkg-config
+            git make tar unzip mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-xz mingw-w64-x86_64-pkg-config mingw-w64-x86_64-binutils
       - name: Build
         run: bash dependencies/windows/build.sh
       - name: Package (per-lib)
@@ -132,7 +132,7 @@ jobs:
           ndk-version: r27c
           add-to-path: false
       - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y nasm yasm make gcc g++ build-essential curl xz-utils
+        run: sudo apt-get update && sudo apt-get install -y nasm yasm make gcc g++ build-essential curl xz-utils zlib1g-dev libssl-dev libffi-dev libreadline-dev libsqlite3-dev libbz2-dev liblzma-dev libncurses-dev libgdbm-dev
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

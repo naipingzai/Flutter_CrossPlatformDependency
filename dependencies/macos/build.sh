@@ -146,10 +146,11 @@ build_python() {
   local DEP_SRC_DIR=cpython-3.12.7
   dl_extract python "https://github.com/python/cpython/archive/refs/tags/v3.12.7.tar.gz" "$DEP_SRC_DIR" "cpython.tar.gz"
   local inst="${STAGE_ROOT}/python-inst"; rm -rf "$inst"
-  local bd="${SRC_ROOT}/python/build"; mkdir -p "$bd" && cd "$bd"
+  local sdir="${SRC_ROOT}/python/${DEP_SRC_DIR}"
+  cd "$sdir"
   export CC="$(xcrun --sdk macosx --find clang)"
   export CFLAGS="-isysroot $(xcrun --sdk macosx --show-sdk-path)"
-  "${SRC_ROOT}/python/${DEP_SRC_DIR}/configure" --prefix="$inst" \
+  ./configure --prefix="$inst" \
     --without-ensurepip --disable-shared --without-doc-strings --disable-test-modules
   make -j"$(platform_jobs)"; make install
   stage_lib python
