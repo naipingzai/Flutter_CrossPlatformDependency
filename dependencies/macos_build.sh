@@ -90,7 +90,9 @@ build_miniz() {
   local objs=()
   for s in $DEP_SOURCES; do local o="${bd}/${s%.c}.o"; "${cc}" "${cflags[@]}" -c "${src}/${s}" -o "$o"; objs+=("$o"); done
   ${ar} rcs "$inst/lib/libminiz.a" "${objs[@]}"
-  ${cc} -dynamiclib -o "$inst/lib/libminiz.dylib" "${objs[@]}"
+  local ldflags=(-dynamiclib -o "$inst/lib/libminiz.dylib")
+  if [ -n "${SYSROOT:-}" ]; then ldflags+=("-isysroot" "${SYSROOT}"); fi
+  ${cc} "${ldflags[@]}" "${objs[@]}"
   for h in $DEP_HEADERS; do cp "${src}/${h}" "$inst/include/${h}"; done
   stage_lib miniz
   cp -a "$inst/include" "${STAGE_ROOT}/miniz/${PLATFORM}/${ARCH_DIR}/include"
@@ -114,7 +116,9 @@ build_stb_image() {
   if [ -n "${SYSROOT:-}" ]; then cflags+=("-isysroot" "${SYSROOT}"); fi
   "${cc}" "${cflags[@]}" -c "${bd}/stb_image.c" -o "${bd}/stb_image.o"
   ${ar} rcs "$inst/lib/libstb_image.a" "$bd/stb_image.o"
-  ${cc} -dynamiclib -o "$inst/lib/libstb_image.dylib" "$bd/stb_image.o"
+  local ldflags=(-dynamiclib -o "$inst/lib/libstb_image.dylib")
+  if [ -n "${SYSROOT:-}" ]; then ldflags+=("-isysroot" "${SYSROOT}"); fi
+  ${cc} "${ldflags[@]}" "$bd/stb_image.o"
   cp "${src}/stb_image.h" "$inst/include/stb_image.h"
   stage_lib stb_image
   cp -a "$inst/include" "${STAGE_ROOT}/stb_image/${PLATFORM}/${ARCH_DIR}/include"
@@ -137,7 +141,9 @@ build_sqlite() {
   if [ -n "${SYSROOT:-}" ]; then cflags+=("-isysroot" "${SYSROOT}"); fi
   "${cc}" "${cflags[@]}" -c "${src}/sqlite3.c" -o "$bd/sqlite3.o"
   ${ar} rcs "$inst/lib/libsqlite3.a" "$bd/sqlite3.o"
-  ${cc} -dynamiclib -o "$inst/lib/libsqlite3.dylib" "$bd/sqlite3.o"
+  local ldflags=(-dynamiclib -o "$inst/lib/libsqlite3.dylib")
+  if [ -n "${SYSROOT:-}" ]; then ldflags+=("-isysroot" "${SYSROOT}"); fi
+  ${cc} "${ldflags[@]}" "$bd/sqlite3.o"
   cp "${src}/sqlite3.h" "$inst/include/sqlite3.h"; cp "${src}/sqlite3ext.h" "$inst/include/sqlite3ext.h"
   stage_lib sqlite
   cp -a "$inst/include" "${STAGE_ROOT}/sqlite/${PLATFORM}/${ARCH_DIR}/include"
