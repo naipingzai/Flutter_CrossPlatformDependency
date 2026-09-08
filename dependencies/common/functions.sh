@@ -114,7 +114,9 @@ stage_release() {
   ls -1 "$out/lib/"*.a 2>/dev/null || echo "  (无)"
   echo "[release] 动态库:"
   ls -1 "$out/lib/"*."$(shared_ext)" 2>/dev/null || echo "  (无)"
-  [ -d "$out/Python.xcframework" ] && echo "[release] xcframework: Python.xcframework"
+  if [ -d "$out/Python.xcframework" ]; then
+    echo "[release] xcframework: Python.xcframework"
+  fi
 }
 
 # ---- Android PIC 校验 ----
