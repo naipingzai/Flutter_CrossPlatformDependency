@@ -32,6 +32,7 @@ build_ffmpeg() {
   if [ "$cross" = "1" ]; then cfg+=(--enable-cross-compile); fi
   if [ -n "${CC:-}" ]; then cfg+=(--cc="${CC}"); fi
   if [ -n "${CXX:-}" ]; then cfg+=(--cxx="${CXX}"); fi
+  if [ -n "${AR:-}" ]; then cfg+=(--ar="${AR}"); fi
   if [ -n "${CROSS_PREFIX:-}" ]; then cfg+=(--cross-prefix="${CROSS_PREFIX}"); fi
   if [ -n "${SYSROOT:-}" ]; then cfg+=(--sysroot="${SYSROOT}"); fi
   if [ -n "${EXTRA_CFLAGS:-}" ]; then cfg+=(--extra-cflags="${EXTRA_CFLAGS}"); fi
