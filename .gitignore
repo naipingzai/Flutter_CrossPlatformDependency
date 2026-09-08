@@ -1,10 +1,11 @@
 # 构建产物
 output/
 *.tar.xz
+*.tar.gz
 *.zip
 install/
 
-# 源码（由 CI 下载）
+# 源码（由 CI 下载到 runner temp，不在仓库内）
 dependencies/**/source/
 
 # 编辑器

@@ -1,0 +1,330 @@
+# ============================================================
+# build_platforms.yml
+# 每个平台自包含编译 5 库（ffmpeg/miniz/stb_image/sqlite/python），
+# 每库分别打包为静态库包和动态库包。
+# Release Job 创建单一 GitHub Release + Markdown 下载表格。
+# 触发：手动 或 push build-* tag。
+# ============================================================
+name: Build All Platforms
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'build-*'
+
+permissions:
+  contents: write
+
+env:
+  DEP_LIBS: "ffmpeg miniz stb_image sqlite python"
+
+jobs:
+  # ============================================================
+  # Linux x86_64
+  # ============================================================
+  linux:
+    name: Linux x86_64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y nasm yasm make gcc g++ build-essential curl xz-utils zlib1g-dev libssl-dev libffi-dev libreadline-dev libsqlite3-dev libbz2-dev liblzma-dev libncurses-dev libgdbm-dev
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build
+        run: bash dependencies/linux_build.sh
+      - name: Package
+        run: |
+          mkdir -p "${RUNNER_TEMP}/pkgs"
+          cd "${RUNNER_TEMP}/deps-stage"
+          for lib in ${{ env.DEP_LIBS }}; do
+            d="${lib}/linux/x86_64"
+            [ -d "$d" ] || continue
+            tmp="${RUNNER_TEMP}/tmp-pkg"; rm -rf "$tmp"
+            mkdir -p "$tmp/include" "$tmp/lib"
+            cp -a "$d/include/." "$tmp/include/" 2>/dev/null || true
+            cp "$d/lib/"*.a "$tmp/lib/" 2>/dev/null || true
+            ls "$tmp/lib/"*.a >/dev/null 2>&1 && (cd "$tmp" && tar -czf "${RUNNER_TEMP}/pkgs/linux-${lib}-static.tar.gz" .)
+            rm -rf "$tmp"; mkdir -p "$tmp/lib"
+            cp "$d/lib/"*.so* "$tmp/lib/" 2>/dev/null || true
+            ls "$tmp/lib/"*.so* >/dev/null 2>&1 && (cd "$tmp" && tar -czf "${RUNNER_TEMP}/pkgs/linux-${lib}-dynamic.tar.gz" .)
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libs-linux
+          path: ${{ runner.temp }}/pkgs
+          if-no-files-found: error
+
+  # ============================================================
+  # Windows x86_64（MSYS2/MinGW64）
+  # ============================================================
+  windows:
+    name: Windows x86_64
+    runs-on: windows-latest
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git make tar unzip mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm
+            mingw-w64-x86_64-xz mingw-w64-x86_64-pkg-config mingw-w64-x86_64-binutils
+      - name: Build
+        run: bash dependencies/windows_build.sh
+      - name: Package
+        run: |
+          mkdir -p "$(cygpath -u "${RUNNER_TEMP}")/pkgs"
+          cd "$(cygpath -u "${RUNNER_TEMP}")/deps-stage"
+          for lib in ${{ env.DEP_LIBS }}; do
+            d="${lib}/windows/x86_64"
+            [ -d "$d" ] || continue
+            tmp="$(cygpath -u "${RUNNER_TEMP}")/tmp-pkg"; rm -rf "$tmp"
+            mkdir -p "$tmp/include" "$tmp/lib"
+            cp -a "$d/include/." "$tmp/include/" 2>/dev/null || true
+            cp "$d/lib/"*.a "$tmp/lib/" 2>/dev/null || true
+            ls "$tmp/lib/"*.a >/dev/null 2>&1 && (cd "$tmp" && tar -czf "$(cygpath -u "${RUNNER_TEMP}")/pkgs/windows-${lib}-static.tar.gz" .)
+            rm -rf "$tmp"; mkdir -p "$tmp/lib"
+            cp "$d/lib/"*.dll "$tmp/lib/" 2>/dev/null || true
+            ls "$tmp/lib/"*.dll >/dev/null 2>&1 && (cd "$tmp" && tar -czf "$(cygpath -u "${RUNNER_TEMP}")/pkgs/windows-${lib}-dynamic.tar.gz" .)
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libs-windows
+          path: ${{ runner.temp }}/pkgs
+          if-no-files-found: error
+
+  # ============================================================
+  # macOS arm64
+  # ============================================================
+  macos:
+    name: macOS arm64
+    runs-on: macos-14
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build
+        run: |
+          export CC="$(xcrun --sdk macosx --find clang)"
+          export SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          bash dependencies/macos_build.sh
+      - name: Package
+        run: |
+          mkdir -p "${RUNNER_TEMP}/pkgs"
+          cd "${RUNNER_TEMP}/deps-stage"
+          for lib in ${{ env.DEP_LIBS }}; do
+            d="${lib}/macos/arm64"
+            [ -d "$d" ] || continue
+            tmp="${RUNNER_TEMP}/tmp-pkg"; rm -rf "$tmp"
+            mkdir -p "$tmp/include" "$tmp/lib"
+            cp -a "$d/include/." "$tmp/include/" 2>/dev/null || true
+            cp "$d/lib/"*.a "$tmp/lib/" 2>/dev/null || true
+            ls "$tmp/lib/"*.a >/dev/null 2>&1 && (cd "$tmp" && tar -czf "${RUNNER_TEMP}/pkgs/macos-${lib}-static.tar.gz" .)
+            rm -rf "$tmp"; mkdir -p "$tmp/lib"
+            cp "$d/lib/"*.dylib "$tmp/lib/" 2>/dev/null || true
+            ls "$tmp/lib/"*.dylib >/dev/null 2>&1 && (cd "$tmp" && tar -czf "${RUNNER_TEMP}/pkgs/macos-${lib}-dynamic.tar.gz" .)
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libs-macos
+          path: ${{ runner.temp }}/pkgs
+          if-no-files-found: error
+
+  # ============================================================
+  # Android arm64-v8a
+  # ============================================================
+  android:
+    name: Android arm64-v8a
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+          add-to-path: false
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y nasm yasm make gcc g++ build-essential curl xz-utils zlib1g-dev libssl-dev libffi-dev libreadline-dev libsqlite3-dev libbz2-dev liblzma-dev libncurses-dev libgdbm-dev
+      - uses: actions/setup-python@v5
+        id: hostpy
+        with:
+          python-version: '3.12'
+      - name: Build
+        env:
+          BUILD_PYTHON: ${{ steps.hostpy.outputs.python-path }}
+          HOST_TRIPLE: "aarch64-linux-android"
+          BUILD_TRIPLE: "x86_64-linux-gnu"
+          CC: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
+          CXX: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang++"
+          AR: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+          RANLIB: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ranlib"
+          STRIP: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+          SYSROOT: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+          EXTRA_CFLAGS: "-DANDROID -fPIC"
+          EXTRA_LDFLAGS: "-L${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21"
+        run: bash dependencies/android_build.sh
+      - name: Package
+        run: |
+          mkdir -p "${RUNNER_TEMP}/pkgs"
+          cd "${RUNNER_TEMP}/deps-stage"
+          for lib in ${{ env.DEP_LIBS }}; do
+            d="${lib}/android/arm64-v8a"
+            [ -d "$d" ] || continue
+            tmp="${RUNNER_TEMP}/tmp-pkg"; rm -rf "$tmp"
+            mkdir -p "$tmp/include" "$tmp/lib"
+            cp -a "$d/include/." "$tmp/include/" 2>/dev/null || true
+            cp "$d/lib/"*.a "$tmp/lib/" 2>/dev/null || true
+            ls "$tmp/lib/"*.a >/dev/null 2>&1 && (cd "$tmp" && tar -czf "${RUNNER_TEMP}/pkgs/android-${lib}-static.tar.gz" .)
+            rm -rf "$tmp"; mkdir -p "$tmp/lib"
+            cp "$d/lib/"*.so "$tmp/lib/" 2>/dev/null || true
+            ls "$tmp/lib/"*.so >/dev/null 2>&1 && (cd "$tmp" && tar -czf "${RUNNER_TEMP}/pkgs/android-${lib}-dynamic.tar.gz" .)
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libs-android
+          path: ${{ runner.temp }}/pkgs
+          if-no-files-found: error
+
+  # ============================================================
+  # iOS arm64（仅静态库）
+  # ============================================================
+  ios:
+    name: iOS arm64
+    runs-on: macos-14
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          export CC="$(xcrun --sdk iphoneos --find clang)"
+          export SYSROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
+          bash dependencies/ios_build.sh
+      - name: Package
+        run: |
+          mkdir -p "${RUNNER_TEMP}/pkgs"
+          cd "${RUNNER_TEMP}/deps-stage"
+          for lib in ${{ env.DEP_LIBS }}; do
+            d="${lib}/ios/arm64"
+            [ -d "$d" ] || continue
+            tmp="${RUNNER_TEMP}/tmp-pkg"; rm -rf "$tmp"
+            mkdir -p "$tmp/include" "$tmp/lib"
+            cp -a "$d/include/." "$tmp/include/" 2>/dev/null || true
+            cp "$d/lib/"*.a "$tmp/lib/" 2>/dev/null || true
+            ls "$tmp/lib/"*.a >/dev/null 2>&1 && (cd "$tmp" && tar -czf "${RUNNER_TEMP}/pkgs/ios-${lib}-static.tar.gz" .)
+            # iOS xcframework
+            [ -d "$d/Python.xcframework" ] && cp -a "$d/Python.xcframework" "$tmp/" 2>/dev/null || true
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libs-ios
+          path: ${{ runner.temp }}/pkgs
+          if-no-files-found: error
+
+  # ============================================================
+  # Release：单一 GitHub Release + 下载表格
+  # ============================================================
+  release:
+    name: Publish Release
+    runs-on: ubuntu-24.04
+    needs: [linux, windows, macos, android, ios]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+      - name: Create Single Release with Download Table
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ALL_FILES=$(find release-assets -name '*.tar.gz' -type f 2>/dev/null | sort)
+          if [ -z "${ALL_FILES}" ]; then
+            echo "无构建产物，跳过 Release"
+            exit 0
+          fi
+
+          REPO="${{ github.repository }}"
+          BASE_URL="https://github.com/${REPO}/releases/download/latest"
+
+          # 解析文件名：platform-lib-type.tar.gz
+          declare -A FILE_MAP
+          for f in ${ALL_FILES}; do
+            b=$(basename "$f")
+            n="${b%.tar.gz}"
+            # 从末尾提取 type（static/dynamic），中间是 lib，开头是 plat
+            type=$(echo "$n" | rev | cut -d'-' -f1 | rev)
+            rest=$(echo "$n" | sed "s/-${type}$//")
+            plat=$(echo "$rest" | cut -d'-' -f1)
+            lib=$(echo "$rest" | sed "s/^${plat}-//")
+            FILE_MAP["${lib}|${plat}|${type}"]="$b"
+          done
+
+          LIBS=("ffmpeg" "miniz" "stb_image" "sqlite" "python")
+          PLATFORMS=("linux" "windows" "macos" "android" "ios")
+
+          NOTES="# 预编译库下载\n\n"
+
+          # 静态库表格
+          NOTES+="## 静态库（.a）\n\n"
+          NOTES+="| 库 | linux | windows | macos | android | ios |\n"
+          NOTES+="|----|-------|---------|-------|---------|-----|\n"
+          for lib in "${LIBS[@]}"; do
+            ROW="| ${lib} |"
+            for plat in "${PLATFORMS[@]}"; do
+              key="${lib}|${plat}|static"
+              if [ -n "${FILE_MAP[$key]}" ]; then
+                fname="${FILE_MAP[$key]}"
+                ROW+=" [下载](${BASE_URL}/${fname}) |"
+              else
+                ROW+=" - |"
+              fi
+            done
+            NOTES+="${ROW}\n"
+          done
+
+          # 动态库表格
+          NOTES+="\n## 动态库（.so/.dylib/.dll）\n\n"
+          NOTES+="| 库 | linux | windows | macos | android |\n"
+          NOTES+="|----|-------|---------|-------|--------|\n"
+          for lib in "${LIBS[@]}"; do
+            ROW="| ${lib} |"
+            for plat in linux windows macos android; do
+              key="${lib}|${plat}|dynamic"
+              if [ -n "${FILE_MAP[$key]}" ]; then
+                fname="${FILE_MAP[$key]}"
+                ROW+=" [下载](${BASE_URL}/${fname}) |"
+              else
+                ROW+=" - |"
+              fi
+            done
+            NOTES+="${ROW}\n"
+          done
+          NOTES+="\n> iOS 仅编译静态库（App Store 禁止第三方动态库）。\n"
+          NOTES+="> python 仅编译静态库。\n"
+
+          echo -e "$NOTES" > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+          # 删除旧 release 和 tags
+          for tag in linux windows macos android ios latest; do
+            gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+          done
+
+          gh release create "latest" \
+            --title "预编译库（全平台）" \
+            --notes-file RELEASE_NOTES.md \
+            ${ALL_FILES}
+
+          echo "Release 已发布"
