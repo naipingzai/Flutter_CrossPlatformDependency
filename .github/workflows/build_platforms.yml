@@ -194,10 +194,10 @@ jobs:
           if-no-files-found: error
 
   # ============================================================
-  # Release：按「平台-库」创建独立 GitHub Release（tag = <platform>-<lib>）
+  # Release：单一 GitHub Release，所有库独立压缩包 + 下载表格
   # ============================================================
   release:
-    name: Publish Releases (per platform-lib)
+    name: Publish Release
     runs-on: ubuntu-24.04
     needs: [linux, windows, macos, android, ios]
     if: always()
@@ -206,19 +206,62 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: release-assets
-      - name: Create per-platform Releases (含各库 tarball)
+      - name: Create Single Release with Download Table
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for plat in linux windows macos android ios; do
-            FILES=$(ls "release-assets/libs-${plat}"/*.tar.gz 2>/dev/null || true)
-            if [ -n "${FILES}" ]; then
-              gh release delete "${plat}" --yes --cleanup-tag 2>/dev/null || true
-              gh release create "${plat}" --title "${plat} 预编译库" \
-                --notes "ffmpeg / miniz / stb_image / sqlite / python（每库一个 tarball）" \
-                ${FILES}
-              echo "${plat} 已发布"
-            else
-              echo "${plat} 无产物，跳过"
-            fi
+          # 收集所有文件
+          ALL_FILES=$(find release-assets -name '*.tar.gz' -type f 2>/dev/null | sort)
+          if [ -z "${ALL_FILES}" ]; then
+            echo "无构建产物，跳过 Release"
+            exit 0
+          fi
+
+          # 解析文件名：platform-lib.tar.gz
+          declare -A FILE_MAP
+          for f in ${ALL_FILES}; do
+            b=$(basename "$f")
+            n="${b%.tar.gz}"
+            plat=$(echo "$n" | cut -d'-' -f1)
+            lib=$(echo "$n" | sed "s/^${plat}-//")
+            FILE_MAP["${lib}|${plat}"]="$b"
           done
+
+          # 生成 Markdown 下载表格
+          LIBS=("ffmpeg" "miniz" "stb_image" "sqlite" "python")
+          PLATFORMS=("linux" "windows" "macos" "android" "ios")
+
+          NOTES="# 预编译库下载\n\n"
+          NOTES+="| 库 | linux | windows | macos | android | ios |\n"
+          NOTES+="|----|-------|---------|-------|---------|-----|\n"
+
+          for lib in "${LIBS[@]}"; do
+            ROW="| ${lib} |"
+            for plat in "${PLATFORMS[@]}"; do
+              key="${lib}|${plat}"
+              if [ -n "${FILE_MAP[$key]}" ]; then
+                ROW+=" [${FILE_MAP[$key]}](/${FILE_MAP[$key]}) |"
+              else
+                ROW+=" - |"
+              fi
+            done
+            NOTES+="${ROW}\n"
+          done
+
+          NOTES+="\n> 每个压缩包包含单一库在单一平台下的预编译产物（include/ + lib/）。\n"
+
+          echo -e "$NOTES" > RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
+          # 删除旧 per-platform releases 和 tags
+          for tag in linux windows macos android ios latest; do
+            gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+          done
+
+          # 创建单一 release，上传所有文件
+          gh release create "latest" \
+            --title "预编译库（全平台）" \
+            --notes-file RELEASE_NOTES.md \
+            ${ALL_FILES}
+
+          echo "Release 已发布"
