@@ -28,6 +28,9 @@ for lib in $DEPS_TO_BUILD; do
   bash "$(dirname "${BASH_SOURCE[0]}")/../libs/${lib}.sh"
 done
 
-stage_platform
+# 发布各库（独立）
+DEPS_TO_BUILD="${LIBS_LIST:-ffmpeg miniz stb_image sqlite python}"
+for lib in $DEPS_TO_BUILD; do
+  stage_release "$lib"
+done
 python_check "$(platform_cc)"
-stage_release

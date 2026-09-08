@@ -45,7 +45,9 @@ for arch in $ANDROID_ARCHS; do
     bash "$(dirname "${BASH_SOURCE[0]}")/../libs/${lib}.sh"
   done
 
-  stage_platform
+  # 发布各库（独立）
+  for lib in ffmpeg miniz stb_image sqlite python; do
+    stage_release "$lib"
+  done
   python_check "$(platform_cc)"
-  stage_release
 done

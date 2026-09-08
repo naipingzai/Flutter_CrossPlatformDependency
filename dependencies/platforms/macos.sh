@@ -26,7 +26,9 @@ for arch in $MACOS_ARCHS; do
     bash "$(dirname "${BASH_SOURCE[0]}")/../libs/${lib}.sh"
   done
 
-  stage_platform
+  # 发布各库（独立）
+  for lib in $DEPS_TO_BUILD; do
+    stage_release "$lib"
+  done
   python_check "$(platform_cc)"
-  stage_release
 done

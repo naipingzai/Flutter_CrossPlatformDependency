@@ -44,6 +44,13 @@ build_ffmpeg() {
   if [ "$PLATFORM" = "ios" ]; then cfg+=(--disable-asm); fi
 
   "${SRC_ROOT}/ffmpeg/${DEP_SRC_DIR}/configure" "${cfg[@]}"
+
+  # Android NDK r27 llvm-ar 对 configure 生成的 ARFLAGS 兼容性问题
+  # 修复：强制 ARFLAGS=rc 替换 configure 可能生成的不兼容标志
+  if [ "$PLATFORM" = "android" ]; then
+    sed -i 's/^ARFLAGS.*/ARFLAGS = rc/' "$bd/ffbuild/config.mak" 2>/dev/null || true
+  fi
+
   make -j"$(platform_jobs)"
   make install
 

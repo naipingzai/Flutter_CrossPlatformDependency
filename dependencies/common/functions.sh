@@ -97,10 +97,13 @@ stage_platform() {
   echo "[platform] 合并完成: ${out}"
 }
 
-# ---- 发布到 release 目录 ----
+# ---- 发布单一库到 release 目录 ----
+# 调用：stage_release <lib>
+# 产物位于：release/<lib>/<PLATFORM>/<ARCH_DIR>/{include,lib}
 stage_release() {
-  local src="${STAGE_ROOT}/${PLATFORM}/${ARCH_DIR}"
-  local out="${DEP_ROOT}/../release/${PLATFORM}/${ARCH_DIR}"
+  local lib="$1"
+  local src="${STAGE_ROOT}/${lib}/${PLATFORM}/${ARCH_DIR}"
+  local out="${DEP_ROOT}/../release/${lib}/${PLATFORM}/${ARCH_DIR}"
   rm -rf "$out"; mkdir -p "$out/include" "$out/lib"
   cp -a "$src/include/." "$out/include/" 2>/dev/null || true
   cp -a "$src/lib/." "$out/lib/" 2>/dev/null || true
@@ -109,13 +112,13 @@ stage_release() {
   if [ -d "${src}/Python.xcframework" ]; then
     cp -a "${src}/Python.xcframework" "$out/"
   fi
-  echo "[release] 产物已发布到: ${out}"
-  echo "[release] 静态库:"
+  echo "[release] ${lib} 产物已发布到: ${out}"
+  echo "[release] ${lib} 静态库:"
   ls -1 "$out/lib/"*.a 2>/dev/null || echo "  (无)"
-  echo "[release] 动态库:"
+  echo "[release] ${lib} 动态库:"
   ls -1 "$out/lib/"*."$(shared_ext)" 2>/dev/null || echo "  (无)"
   if [ -d "$out/Python.xcframework" ]; then
-    echo "[release] xcframework: Python.xcframework"
+    echo "[release] ${lib} xcframework: Python.xcframework"
   fi
 }
 
