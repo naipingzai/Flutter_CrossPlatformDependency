@@ -35,7 +35,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Build
-        run: bash dependencies/linux/build.sh
+        run: bash dependencies/linux_build.sh
       - name: Package (per-lib)
         run: |
           mkdir -p "${RUNNER_TEMP}/pkgs"
@@ -70,7 +70,7 @@ jobs:
             git make tar unzip mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm
             mingw-w64-x86_64-xz mingw-w64-x86_64-pkg-config mingw-w64-x86_64-binutils
       - name: Build
-        run: bash dependencies/windows/build.sh
+        run: bash dependencies/windows_build.sh
       - name: Package (per-lib)
         run: |
           mkdir -p "$(cygpath -u "${RUNNER_TEMP}")/pkgs"
@@ -101,7 +101,7 @@ jobs:
         run: |
           export CC="$(xcrun --sdk macosx --find clang)"
           export SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
-          bash dependencies/macos/build.sh
+          bash dependencies/macos_build.sh
       - name: Package (per-lib)
         run: |
           mkdir -p "${RUNNER_TEMP}/pkgs"
@@ -150,7 +150,7 @@ jobs:
           SYSROOT: "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
           EXTRA_CFLAGS: "-DANDROID -fPIC"
           EXTRA_LDFLAGS: "-L${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/21"
-        run: bash dependencies/android/build.sh
+        run: bash dependencies/android_build.sh
       - name: Package (per-lib)
         run: |
           mkdir -p "${RUNNER_TEMP}/pkgs"
@@ -178,7 +178,7 @@ jobs:
         run: |
           export CC="$(xcrun --sdk iphoneos --find clang)"
           export SYSROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
-          bash dependencies/ios/build.sh
+          bash dependencies/ios_build.sh
       - name: Package (per-lib)
         run: |
           mkdir -p "${RUNNER_TEMP}/pkgs"

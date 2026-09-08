@@ -50,7 +50,7 @@ APP 仓库（如 `Flutter_FileManager`）**不维护第三方库的跨平台编�
 ## 1. 设计原则
 
 - **按平台组织、完全自包含**：目录以平台为顶层维度，每个
-  `dependencies/<platform>/build.sh` 不依赖任何共享脚本/其它平台，单独即可编译该平台全部库。
+  `dependencies/<platform>_build.sh` 不依赖任何共享脚本/其它平台，单独即可编译该平台全部库。
 - **构建逻辑复用已验证脚本**：各库编译函数照抄自 per-tool 已验证脚本，
   保证跨平台一致性，仅做平台编排（工具链 env）与产物合并。
 - **平台配置集中在 workflow**：runner / 工具链 / ARCH 在
@@ -64,11 +64,11 @@ APP 仓库（如 `Flutter_FileManager`）**不维护第三方库的跨平台编�
 ```text
 Flutter_CrossPlatformDependency/
 ├── dependencies/
-│   ├── linux/   build.sh     # Linux x86_64
-│   ├── windows/ build.sh     # Windows x86_64（MSYS2/MinGW64）
-│   ├── macos/   build.sh     # macOS arm64
-│   ├── android/ build.sh     # Android arm64-v8a（NDK 交叉）
-│   └── ios/     build.sh     # iOS arm64
+│   ├── linux_build.sh        # Linux x86_64
+│   ├── windows_build.sh      # Windows x86_64（MSYS2/MinGW64）
+│   ├── macos_build.sh        # macOS arm64
+│   ├── android_build.sh      # Android arm64-v8a（NDK 交叉）
+│   └── ios_build.sh          # iOS arm64
 └── .github/workflows/
     └── build_platforms.yml   # 5 个平台 Job + release Job
 ```
@@ -135,7 +135,7 @@ build_foo() {
 
 ### 步骤 2：在各平台调用并合并
 
-在 `dependencies/<platform>/build.sh` 底部：
+在 `dependencies/<platform>_build.sh` 底部：
 
 ```bash
 build_ffmpeg; build_miniz; build_stb_image; build_sqlite; build_python; build_foo   # 加 build_foo
