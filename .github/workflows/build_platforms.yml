@@ -36,18 +36,16 @@ jobs:
           python-version: '3.12'
       - name: Build
         run: bash dependencies/build.sh linux
-      - name: Package (per-lib)
-        run: |
-          mkdir -p "${RUNNER_TEMP}/pkgs"
-          cd release/linux/x86_64
-          for lib in ${{ env.DEP_LIBS }}; do
-            if [ -d "${lib}" ]; then (cd "${lib}" && tar -czf "${RUNNER_TEMP}/pkgs/linux-${lib}.tar.gz" .); fi
-          done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: libs-linux
-          path: ${{ runner.temp }}/pkgs
-          if-no-files-found: error
+       - name: Package
+         run: |
+           mkdir -p "${RUNNER_TEMP}/pkgs"
+           cd release
+           tar -czf "${RUNNER_TEMP}/pkgs/linux-x86_64.tar.gz" linux/x86_64
+       - uses: actions/upload-artifact@v4
+         with:
+           name: libs-linux
+           path: ${{ runner.temp }}/pkgs
+           if-no-files-found: error
 
   # ============================================================
   # Windows x86_64 (MSYS2/MinGW64)
@@ -70,18 +68,16 @@ jobs:
             mingw-w64-x86_64-xz mingw-w64-x86_64-pkg-config mingw-w64-x86_64-binutils
       - name: Build
         run: bash dependencies/build.sh windows
-      - name: Package (per-lib)
-        run: |
-          mkdir -p "$(cygpath -u "${RUNNER_TEMP}")/pkgs"
-          cd release/windows/x86_64
-          for lib in ${{ env.DEP_LIBS }}; do
-            if [ -d "${lib}" ]; then (cd "${lib}" && tar -czf "$(cygpath -u "${RUNNER_TEMP}")/pkgs/windows-${lib}.tar.gz" .); fi
-          done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: libs-windows
-          path: ${{ runner.temp }}/pkgs
-          if-no-files-found: error
+       - name: Package
+         run: |
+           mkdir -p "$(cygpath -u "${RUNNER_TEMP}")/pkgs"
+           cd release
+           tar -czf "$(cygpath -u "${RUNNER_TEMP}")/pkgs/windows-x86_64.tar.gz" windows/x86_64
+       - uses: actions/upload-artifact@v4
+         with:
+           name: libs-windows
+           path: ${{ runner.temp }}/pkgs
+           if-no-files-found: error
 
   # ============================================================
   # macOS arm64 + x86_64
@@ -97,20 +93,18 @@ jobs:
           python-version: '3.12'
       - name: Build
         run: bash dependencies/build.sh macos
-      - name: Package (per-lib per-arch)
-        run: |
-          mkdir -p "${RUNNER_TEMP}/pkgs"
-          for arch in arm64 x86_64; do
-            cd release/macos/${arch}
-            for lib in ${{ env.DEP_LIBS }}; do
-              if [ -d "${lib}" ]; then (cd "${lib}" && tar -czf "${RUNNER_TEMP}/pkgs/macos-${lib}-${arch}.tar.gz" .); fi
-            done
-          done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: libs-macos
-          path: ${{ runner.temp }}/pkgs
-          if-no-files-found: error
+       - name: Package
+         run: |
+           mkdir -p "${RUNNER_TEMP}/pkgs"
+           cd release
+           for arch in arm64 x86_64; do
+             tar -czf "${RUNNER_TEMP}/pkgs/macos-${arch}.tar.gz" macos/${arch}
+           done
+       - uses: actions/upload-artifact@v4
+         with:
+           name: libs-macos
+           path: ${{ runner.temp }}/pkgs
+           if-no-files-found: error
 
   # ============================================================
   # Android (4 architectures)
@@ -138,20 +132,18 @@ jobs:
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
           BUILD_PYTHON: ${{ steps.hostpy.outputs.python-path }}
         run: bash dependencies/build.sh android
-      - name: Package (per-lib per-arch)
-        run: |
-          mkdir -p "${RUNNER_TEMP}/pkgs"
-          for arch in armeabi-v7a arm64-v8a x86 x86_64; do
-            cd release/android/${arch}
-            for lib in ${{ env.DEP_LIBS }}; do
-              if [ -d "${lib}" ]; then (cd "${lib}" && tar -czf "${RUNNER_TEMP}/pkgs/android-${lib}-${arch}.tar.gz" .); fi
-            done
-          done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: libs-android
-          path: ${{ runner.temp }}/pkgs
-          if-no-files-found: error
+       - name: Package
+         run: |
+           mkdir -p "${RUNNER_TEMP}/pkgs"
+           cd release
+           for arch in armeabi-v7a arm64-v8a x86 x86_64; do
+             tar -czf "${RUNNER_TEMP}/pkgs/android-${arch}.tar.gz" android/${arch}
+           done
+       - uses: actions/upload-artifact@v4
+         with:
+           name: libs-android
+           path: ${{ runner.temp }}/pkgs
+           if-no-files-found: error
 
   # ============================================================
   # iOS arm64
@@ -164,18 +156,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build
         run: bash dependencies/build.sh ios
-      - name: Package (per-lib)
-        run: |
-          mkdir -p "${RUNNER_TEMP}/pkgs"
-          cd release/ios/arm64
-          for lib in ${{ env.DEP_LIBS }}; do
-            if [ -d "${lib}" ]; then (cd "${lib}" && tar -czf "${RUNNER_TEMP}/pkgs/ios-${lib}.tar.gz" .); fi
-          done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: libs-ios
-          path: ${{ runner.temp }}/pkgs
-          if-no-files-found: error
+       - name: Package
+         run: |
+           mkdir -p "${RUNNER_TEMP}/pkgs"
+           cd release
+           tar -czf "${RUNNER_TEMP}/pkgs/ios-arm64.tar.gz" ios/arm64
+       - uses: actions/upload-artifact@v4
+         with:
+           name: libs-ios
+           path: ${{ runner.temp }}/pkgs
+           if-no-files-found: error
 
   # ============================================================
   # Release：单一 GitHub Release，所有平台所有库放在一起
@@ -202,44 +192,19 @@ jobs:
           fi
 
           # 生成 Markdown 下载表格
+          # 文件格式：platform-arch.tar.gz (如 linux-x86_64.tar.gz, android-arm64-v8a.tar.gz)
           NOTES="# 预编译库下载\n\n"
-          NOTES+="| 平台 | 架构 | ffmpeg | miniz | stb_image | sqlite | python |\n"
-          NOTES+="|------|------|--------|-------|-----------|--------|--------|\n"
+          NOTES+="| 平台 | 架构 | 下载 |\n"
+          NOTES+="|------|------|------|\n"
 
           declare -A FILE_MAP
           for f in ${ALL_FILES}; do
             basename=$(basename "$f")
-            # 解析文件名：platform-lib-arch.tar.gz 或 platform-lib.tar.gz
-            # 移除 .tar.gz
             name="${basename%.tar.gz}"
-            # 提取平台（第一段）
             plat=$(echo "$name" | cut -d'-' -f1)
-            # 提取库名（最后一段之前的是架构，最后一段之前的是库...）
-            # 格式：linux-ffmpeg, linux-ffmpeg, macos-ffmpeg-arm64, android-ffmpeg-arm64-v8a
-            # 从后往前：最后是 arch（可能含连字符），然后是 lib
-            case "$plat" in
-              android)
-                # android-lib-arch：arch 可能是 armeabi-v7a / arm64-v8a / x86 / x86_64
-                arch=$(echo "$name" | sed "s/^${plat}-[${a-z}_]*-//" )
-                lib=$(echo "$name" | sed "s/^${plat}-//" | sed "s/-${arch}$//")
-                ;;
-              macos)
-                # macos-lib-arch：arch 是 arm64 / x86_64
-                arch=$(echo "$name" | rev | cut -d'-' -f1 | rev)
-                lib=$(echo "$name" | sed "s/^${plat}-//" | sed "s/-${arch}$//")
-                ;;
-              ios)
-                # ios-lib
-                lib=$(echo "$name" | sed "s/^${plat}-//")
-                arch="arm64"
-                ;;
-              *)
-                # linux-lib, windows-lib
-                lib=$(echo "$name" | sed "s/^${plat}-//")
-                arch="x86_64"
-                ;;
-            esac
-            FILE_MAP["${plat}|${arch}|${lib}"]="$basename"
+            # arch 是平台名之后的所有内容
+            arch=$(echo "$name" | sed "s/^${plat}-//")
+            FILE_MAP["${plat}|${arch}"]="$basename"
           done
 
           # 定义平台顺序
@@ -249,7 +214,6 @@ jobs:
           ARCHS_MACOS="arm64 x86_64"
           ARCHS_ANDROID="armeabi-v7a arm64-v8a x86 x86_64"
           ARCHS_IOS="arm64"
-          LIBS="ffmpeg miniz stb_image sqlite python"
 
           for plat in "${PLATFORMS[@]}"; do
             case "$plat" in
@@ -260,26 +224,16 @@ jobs:
               ios)     ARCH_LIST=($ARCHS_IOS) ;;
             esac
             for arch in "${ARCH_LIST[@]}"; do
-              ROW="| ${plat} | ${arch} |"
-              FIRST_LIB=true
-              for lib in $LIBS; do
-                key="${plat}|${arch}|${lib}"
-                if [ -n "${FILE_MAP[$key]}" ]; then
-                  if [ "$FIRST_LIB" = true ]; then
-                    ROW+=" [${FILE_MAP[$key]}](/${FILE_MAP[$key]}) |"
-                    FIRST_LIB=false
-                  else
-                    ROW+=" [${FILE_MAP[$key]}](/${FILE_MAP[$key]}) |"
-                  fi
-                else
-                  ROW+=" - |"
-                fi
-              done
-              # 去掉末尾空格
-              ROW=$(echo "$ROW" | sed 's/ |$//')
-              NOTES+="${ROW}\n"
+              key="${plat}|${arch}"
+              if [ -n "${FILE_MAP[$key]}" ]; then
+                NOTES+="| ${plat} | ${arch} | [${FILE_MAP[$key]}](/${FILE_MAP[$key]}) |\n"
+              else
+                NOTES+="| ${plat} | ${arch} | - |\n"
+              fi
             done
           done
+
+          NOTES+="\n> 每个压缩包包含 include/ 和 lib/ 目录，含该平台所有库（ffmpeg, miniz, stb_image, sqlite, python）的预编译产物。\n"
 
           echo -e "$NOTES" > RELEASE_NOTES.md
           cat RELEASE_NOTES.md
