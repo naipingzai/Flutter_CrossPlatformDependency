@@ -98,6 +98,7 @@ build_ffmpeg() {
   # 追加编译/链接参数（EXTRA_CFLAGS 必须含 -fPIC，见 workflow 注入）
   if [ -n "${EXTRA_CFLAGS:-}" ]; then cfg+=(--extra-cflags="${EXTRA_CFLAGS}"); fi
   if [ -n "${EXTRA_LDFLAGS:-}" ]; then cfg+=(--extra-ldflags="${EXTRA_LDFLAGS}"); fi
+  if [ -n "${STRIP:-}" ]; then cfg+=(--strip="${STRIP}"); fi
   # iOS 无汇编加速需要，Android 保留 asm（neon）
   if [ "$PLATFORM" = "ios" ]; then cfg+=(--disable-asm); fi
   # Android 静态库会被链接进共享库 libfileops.so，必须生成 PIC。
