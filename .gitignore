@@ -5,8 +5,8 @@ output/
 *.zip
 install/
 
-# 源码（由 CI 下载到 runner temp，不在仓库内）
-dependencies/**/source/
+# 源码与中间产物（由构建脚本下载/生成，不在仓库内）
+dependencies/source/
 
 # 编辑器
 .idea/
@@ -15,3 +15,7 @@ dependencies/**/source/
 
 # 系统
 .DS_Store
+
+# release 产物（由构建脚本生成，不提交到仓库）
+release/
+

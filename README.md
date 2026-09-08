@@ -1,25 +1,26 @@
 # Flutter_CrossPlatformDependency
 
-> 第三方原生 C/C++ 库的**跨平台静态编译**仓库。
+> 第三方原生 C/C++ 库的**跨平台编译**仓库。
 > 只负责「获取源码 → 编译 → 发布产物」，不参与任何 APP 业务逻辑。
+> 同时编译**静态库（.a）**和**动态库（.so/.dylib/.dll）**，产物输出到 `release/` 目录。
 
-## 0. 背景：为什么是「静态库」，各平台对原生代码形态的支持
+## 0. 背景：静态库与动态库，各平台对原生代码形态的支持
 
-本仓库把第三方库统一编译为**静态库 `.a`**，因为这是唯一能在 5 个平台统一交付
-且被 iOS 强制要求的形式。各平台对原生代码的加载方式差异如下：
+本仓库把第三方库统一编译为**静态库**和**动态库**，APP 可按需选择使用哪种形态。
+各平台对原生代码的加载方式差异如下：
 
-| 平台 | 原生代码如何进入 APP | Dart/运行时如何找到它 | 是否需要 PIC | FFmpeg 形态 |
-|------|---------------------|----------------------|:---:|:---:|
-| Linux | 静态链接进**可执行文件** (Flutter runner) | `DynamicLibrary.process()` 查进程符号表 | 否 | 静态 `.a` |
-| Windows | 静态链接进 **.exe** | `DynamicLibrary.process()` | 否 | 静态 `.a` |
-| macOS | 静态链接进**可执行文件** | `DynamicLibrary.process()` | 否 | 静态 `.a` |
-| Android | 打包进共享库壳 **`libfileops.so`** | `DynamicLibrary.open('libfileops.so')` | **是（强制）** | 静态 `.a` |
-| iOS | 静态链接进 **Mach-O** | `DynamicLibrary.process()` | 否 | 静态 `.a` |
+| 平台 | 原生代码如何进入 APP | Dart/运行时如何找到它 | 是否需要 PIC | 静态库扩展名 | 动态库扩展名 |
+|------|---------------------|----------------------|:---:|:---:|:---:|
+| Linux | 静态链接进**可执行文件** 或 加载 `.so` | `DynamicLibrary.process()` / `.open()` | 是（.so 必须） | `.a` | `.so` |
+| Windows | 静态链接进 **.exe** 或 加载 `.dll` | `DynamicLibrary.process()` / `.open()` | 否 | `.a` | `.dll` |
+| macOS | 静态链接进**可执行文件** 或 加载 `.dylib` | `DynamicLibrary.process()` / `.open()` | 是（.dylib 必须） | `.a` | `.dylib` |
+| Android | 打包进共享库壳 **`libfileops.so`** 或加载 `.so` | `DynamicLibrary.open('libfileops.so')` | **是（强制）** | `.a` | `.so` |
+| iOS | 静态链接进 **Mach-O** | `DynamicLibrary.process()` | 否 | `.a` | `.dylib` |
 
 ### 关键差异说明
 
-1. **iOS 强制静态库**：App Store 禁止运行时加载第三方动态库，原生代码必须
-   静态链接进最终 Mach-O。→ FFmpeg 只能编 `.a`。
+1. **iOS 动态库限制**：App Store 禁止运行时加载第三方动态库，原生代码必须
+   静态链接进最终 Mach-O。→ **iOS 发布时使用静态库 `.a`**，动态库仅用于开发/测试。
 2. **Android 的 `.so` 壳 + PIC**：Android 无可执行文件，原生代码必须打包成
    共享库 `libfileops.so`（Dart 通过 `DynamicLibrary.open` 加载）。**共享库在
    ARM64 上强制要求所有代码为位置无关（PIC）**。若静态库缺 `-fPIC`，链接时会报：
@@ -29,34 +30,65 @@
    ```
    因此 **Android 的 FFmpeg 必须带 `-fPIC`**（已通过 `--enable-pic` + workflow
    注入 `-fPIC` 保证，并在脚本末尾做 PIC 校验，非 PIC 直接构建失败）。
-3. **桌面/iOS 无需 PIC**：静态链接进可执行文件/Mach-O 不要求 PIC，这也是同一套
-   FFmpeg 源码在 Linux 能过、Android 却报错的原因。
+3. **桌面/iOS 的 PIC**：静态链接进可执行文件/Mach-O 不要求 PIC，但动态库
+   （.so/.dylib）必须使用 PIC 代码。本仓库所有编译已统一加 `-fPIC`。
 4. **结论**：跨平台的"麻烦"主要来自 Android 的 `.so` 壳与 PIC 要求，以及 iOS 的
    静态链接强制——这是移动多平台 + 大型原生库的固有成本，与前端框架（Flutter）
-   无关。本仓库用「一套静态库 + 每平台自包含脚本」把这份成本收敛到最标准形态。
+   无关。本仓库用「一套静态库 + 动态库 + 矩阵式构建脚本」把这份成本收敛到最标准形态。
 
 ---
 
 ## 工程描述
 
 本仓库把 APP 需要的第三方原生库（ffmpeg / miniz / stb_image / sqlite / python）
-在 **5 个目标平台**（linux / windows / macos / android / ios）上编译为**静态库**，
-并发布为按平台区分、按库分开的 GitHub Release 产物（`include/` + `lib/`）。
+在 **5 个目标平台**（linux / windows / macos / android / ios）上编译为**静态库和动态库**，
+并发布到 `release/` 目录中，按平台区分、按库分开。
 
 APP 仓库（如 `Flutter_FileManager`）**不维护第三方库的跨平台编译逻辑**，
-只从本仓库 Release 下载对应平台的产物使用（或直接 vendor 进 APP 工程）。
+只从本仓库 `release/` 目录获取对应平台的产物使用（或直接 vendor 进 APP 工程）。
 
 ---
 
 ## 1. 设计原则
 
-- **按平台组织、完全自包含**：目录以平台为顶层维度，每个
-  `dependencies/<platform>/build.sh` 不依赖任何共享脚本/其它平台，单独即可编译该平台全部库。
-- **构建逻辑复用已验证脚本**：各库编译函数照抄自 per-tool 已验证脚本，
-  保证跨平台一致性，仅做平台编排（工具链 env）与产物合并。
-- **平台配置集中在 workflow**：runner / 工具链 / ARCH 在
-  `.github/workflows/build_platforms.yml` 对应平台 Job。
-- **产物按平台区分、按库分开**：每个平台一个 GitHub Release，内含各库独立的 tarball。
+### dependencies — 矩阵式结构
+
+采用 **平台 × 库** 的矩阵式架构，将"平台配置"与"库编译逻辑"正交分离：
+
+```
+dependencies/
+├── build.sh              # 统一入口：bash build.sh <platform>
+├── common/
+│   ├── config.sh         # 全局配置（版本、URL、通用标志）
+│   └── functions.sh      # 通用函数（dl_extract, stage_lib, create_shared_lib 等）
+├── libs/                 # 库编译逻辑（平台无关）
+│   ├── ffmpeg.sh
+│   ├── miniz.sh
+│   ├── stb_image.sh
+│   ├── sqlite.sh
+│   └── python.sh
+├── platforms/            # 平台配置（工具链、架构循环）
+│   ├── linux.sh
+│   ├── windows.sh
+│   ├── macos.sh
+│   ├── android.sh        # 循环 4 架构
+│   └── ios.sh
+```
+
+**新增一个库** = 只需在 `libs/` 下新增一个 `.sh` 文件 + 在 `config.sh` 的 `LIBS_LIST`
+中注册名称，所有平台自动获得该库的编译能力。
+
+**新增一个平台** = 只需在 `platforms/` 下新增一个 `.sh` 文件，设置工具链环境变量，
+遍历所有库进行编译。
+
+### 设计优势
+
+| 特性 | 旧版（按平台自包含） | 新版（矩阵式） |
+|------|---------------------|---------------|
+| 新增库 | 需修改 5 个平台脚本 | 只需 1 个库脚本 + 1 行注册 |
+| 新增平台 | 需复制全部库编译逻辑 | 只需 1 个平台脚本 |
+| 代码复用 | 0%，大量重复 | 100%，库脚本共享 |
+| 维护成本 | 5N（N=库数） | M+N（M=平台数） |
 
 ---
 
@@ -64,36 +96,63 @@ APP 仓库（如 `Flutter_FileManager`）**不维护第三方库的跨平台编�
 
 ```text
 Flutter_CrossPlatformDependency/
-├── dependencies/
-│   ├── linux/   build.sh     # Linux x86_64
-│   ├── windows/ build.sh     # Windows x86_64（MSYS2/MinGW64）
-│   ├── macos/   build.sh     # macOS arm64
-│   ├── android/ build.sh     # Android arm64-v8a（NDK 交叉）
-│   └── ios/     build.sh     # iOS arm64
+├── dependencies/                   # 矩阵式结构
+│   ├── build.sh                    # 统一入口
+│   ├── common/
+│   │   ├── config.sh               # 全局配置
+│   │   └── functions.sh            # 通用函数
+│   ├── libs/                       # 库编译脚本
+│   │   ├── ffmpeg.sh
+│   │   ├── miniz.sh
+│   │   ├── stb_image.sh
+│   │   ├── sqlite.sh
+│   │   └── python.sh
+│   └── platforms/                  # 平台配置脚本
+│       ├── linux.sh
+│       ├── windows.sh
+│       ├── macos.sh
+│       ├── android.sh
+│       └── ios.sh
+├── release/                        # 构建产物输出目录
+│   ├── linux/x86_64/
+│   ├── windows/x86_64/
+│   ├── macos/arm64/
+│   ├── macos/x86_64/
+│   ├── android/armeabi-v7a/
+│   ├── android/arm64-v8a/
+│   ├── android/x86/
+│   ├── android/x86_64/
+│   └── ios/arm64/
 └── .github/workflows/
-    └── build_platforms.yml   # 5 个平台 Job + release Job
+    └── build_platforms.yml
 ```
 
-### 每个平台 build.sh 结构
+### 执行流程
 
-自包含脚本，包含以下段落：
+```
+bash dependencies/build.sh <platform>
+  → 加载 common/config.sh + common/functions.sh
+  → 加载 platforms/<platform>.sh
+  → 遍历 ARCH 列表，对每个架构：
+      → 设置工具链 (CC/CXX/AR/SYSROOT)
+      → 遍历 LIBS_LIST，对每个库：
+          → 执行 libs/<lib>.sh
+          → stage_lib 到临时目录
+      → stage_platform 合并为平台产物
+      → stage_release 输出到 release/
+```
 
-| 段落 | 内容 |
-|------|------|
-| 环境 | `PLATFORM` / `ARCH` / `ARCH_DIR` / 工具链（CC/AR/SYSROOT 等） |
-| 通用函数 | `dl_extract`（下载解压，含 Windows cygpath 处理）、`platform_cc/ar/jobs` 等 |
-| 各库构建 | `build_ffmpeg` / `build_miniz` / `build_stb_image` / `build_sqlite` / `build_python` |
-| 合并 | `stage_platform` 把各库 include/lib 合并为该平台统一产物 |
+---
 
-### 各平台编译的 5 个库
+## 3. 各平台编译的库
 
-| 库 | 构建方式 | 产物 |
-|----|---------|------|
-| ffmpeg | autoconf（按平台 target-os，交叉加 `--enable-cross-compile`） | `libavformat.a` `libavcodec.a` `libavutil.a` `libswscale.a` `libswresample.a` |
-| miniz | 直接编译 amalgamation | `libminiz.a` |
-| stb_image | 直接编译 | `libstb_image.a` |
-| sqlite | 直接编译 sqlite3.c | `libsqlite3.a` |
-| python | linux/macos autoconf（原生，已验证）；windows 官方 embeddable；android 交叉、ios Apple-support（best-effort，交叉编译较难） | `libpython3.12.a` / embeddable / `.xcframework` |
+| 库 | 构建方式 | 静态库产物 | 动态库产物 |
+|----|---------|------|------|
+| ffmpeg | autoconf（按平台 target-os，交叉加 `--enable-cross-compile`，`--enable-static --enable-shared`） | `libavformat.a` `libavcodec.a` `libavutil.a` `libswscale.a` `libswresample.a` | `libavformat.so/.dylib/.dll` 等 |
+| miniz | 直接编译 amalgamation（-fPIC） | `libminiz.a` | `libminiz.so/.dylib/.dll` |
+| stb_image | 直接编译（-fPIC） | `libstb_image.a` | `libstb_image.so/.dylib/.dll` |
+| sqlite | 直接编译 sqlite3.c（-fPIC） | `libsqlite3.a` | `libsqlite3.so/.dylib/.dll` |
+| python | linux/macos autoconf（原生，已验证）；windows 官方 embeddable；android 交叉、ios Apple-support（best-effort） | `libpython3.12.a` / embeddable / `.xcframework` | （python 通常仅静态） |
 
 > **python**：linux/macos/windows 真实编译；**android/ios 交叉编译 CPython 较难**
 > （configure 无法运行目标二进制），为 best-effort——失败会明确报错并跳过该库，**不影响**
@@ -101,78 +160,78 @@ Flutter_CrossPlatformDependency/
 
 ---
 
-## 3. 新增一个库（流程）
+## 4. 新增一个库（流程）
 
-由于采用「按平台自包含」结构，新增一个库 = 在每个需要它的平台 `build.sh`
-里加入该库的构建函数 + 合并，并（可选）加入 workflow 的打包/发布。
+矩阵式结构下，新增一个库只需 3 步：
 
-### 步骤 1：编写构建函数（照抄成熟模式）
-
-参考现有 `build_miniz`/`build_sqlite`（直接编译）或 `build_ffmpeg`（autoconf）：
+### 步骤 1：在 `libs/` 下创建编译脚本
 
 ```bash
-# 例：新增库 build_foo（直接编译）
-build_foo() {
-  local DEP_SRC_DIR=foo-1.0
-  dl_extract foo "https://.../foo-1.0.tar.gz" "$DEP_SRC_DIR" "foo.tar.gz"   # 下载
-  local cc; cc="$(platform_cc)"
-  local inst="${STAGE_ROOT}/foo-inst"; rm -rf "$inst"; mkdir -p "$inst/include" "$inst/lib"
-  local bd="${SRC_ROOT}/foo/build"; rm -rf "$bd"; mkdir -p "$bd"
-  "${cc}" -O2 -fPIC -c "${SRC_ROOT}/foo/${DEP_SRC_DIR}/foo.c" -o "$bd/foo.o"
-  $(platform_ar) rcs "$inst/lib/libfoo.a" "$bd/foo.o"                       # 归档
-  cp "${SRC_ROOT}/foo/${DEP_SRC_DIR}/foo.h" "$inst/include/"                # 头文件
-  # 输出到统一 stage
-  stage_lib foo
-  cp -a "$inst/include" "${STAGE_ROOT}/foo/${PLATFORM}/${ARCH_DIR}/include"
-  cp -a "$inst/lib" "${STAGE_ROOT}/foo/${PLATFORM}/${ARCH_DIR}/lib"
-  echo "[foo] 完成"
+# libs/mylib.sh
+# 引用全局配置和函数（由平台脚本在调用前 source）
+build_mylib() {
+  local DEP_SRC_DIR="mylib-1.0"
+  dl_extract mylib "https://.../mylib-1.0.tar.gz" "$DEP_SRC_DIR" "mylib.tar.gz"
+
+  local cc ar; cc="$(platform_cc)"; ar="$(platform_ar)"
+  local inst="${STAGE_ROOT}/mylib-inst"; rm -rf "$inst"; mkdir -p "$inst/include" "$inst/lib"
+  local bd="${SRC_ROOT}/mylib/build"; rm -rf "$bd"; mkdir -p "$bd"
+
+  "${cc}" -O2 -fPIC -c "${SRC_ROOT}/mylib/${DEP_SRC_DIR}/mylib.c" -o "$bd/mylib.o"
+  ${ar} rcs "$inst/lib/libmylib.a" "$bd/mylib.o"
+  create_shared_lib "${cc}" "$inst/lib/libmylib.$(shared_ext)" "$bd/mylib.o"
+  cp "${SRC_ROOT}/mylib/${DEP_SRC_DIR}/mylib.h" "$inst/include/"
+  stage_lib mylib
+  echo "[mylib] 完成"
 }
+build_mylib
 ```
 
-要点：
-- **下载**用 `dl_extract <dep> <url> <src_dir> <tarball>`（已处理 Windows 路径）。
-- **编译/归档**用 `platform_cc` / `platform_ar`（跨平台）。
-- **产物**输出到 `${STAGE_ROOT}/<lib>/<PLATFORM>/<ARCH_DIR>/{include,lib}`。
-
-### 步骤 2：在各平台调用并合并
-
-在 `dependencies/<platform>/build.sh` 底部：
+### 步骤 2：在 `common/config.sh` 中注册
 
 ```bash
-build_ffmpeg; build_miniz; build_stb_image; build_sqlite; build_python; build_foo   # 加 build_foo
-stage_platform
+LIBS_LIST="ffmpeg miniz stb_image sqlite python mylib"
 ```
 
-`stage_platform` 已会自动合并 `foo` 的产物（因为它遍历固定列表，需把 `foo` 加入其 `for dep in ...` 循环）。
+### 步骤 3：在 workflow 的 `env.DEP_LIBS` 中加入 `mylib`
 
-### 步骤 3：workflow 打包与发布
-
-在 `build_platforms.yml` 的 `env.LIBS` 加入 `foo`，各平台 Package 步骤会自动
-打出 `<platform>-foo.tar.gz`，release Job 会把它并入该平台的 Release。
+所有平台自动获得该库编译能力，无需修改任何平台脚本。
 
 ---
 
-## 4. 产物结构
+## 5. 产物结构
 
-每个平台一个 GitHub Release（tag = `linux` / `windows` / `macos` / `android` / `ios`），
-内含该平台**各库独立的 tarball**：
+构建完成后，产物自动输出到 `release/` 目录：
 
 ```text
-linux Release:
-  linux-ffmpeg.tar.gz    linux-miniz.tar.gz    linux-stb_image.tar.gz
-  linux-sqlite.tar.gz    linux-python.tar.gz
-windows Release:
-  windows-ffmpeg.tar.gz  windows-sqlite.tar.gz ...
-macos / android / ios 同理
+release/
+├── linux/x86_64/
+│   ├── ffmpeg/   include/ + lib/ (lib*.a + lib*.so)
+│   ├── miniz/    include/ + lib/
+│   ├── stb_image/ include/ + lib/
+│   ├── sqlite/   include/ + lib/
+│   └── python/   include/ + lib/
+├── windows/x86_64/
+│   ├── ffmpeg/   ...
+│   └── ...
+├── macos/
+│   ├── arm64/    ...
+│   └── x86_64/   ...
+├── android/
+│   ├── armeabi-v7a/ ...
+│   ├── arm64-v8a/   ...
+│   ├── x86/         ...
+│   └── x86_64/      ...
+└── ios/arm64/
+    ├── ffmpeg/   ...
+    └── ...
 ```
 
-每个 `<platform>-<lib>.tar.gz` 解压后为该库的 `include/` + `lib/`。
-
-架构：linux x86_64 / windows x86_64 / macos arm64 / android arm64-v8a / ios arm64。
+每个库目录下包含 `include/`（头文件）和 `lib/`（静态库 + 动态库）。
 
 ---
 
-## 5. 触发 CI
+## 6. 触发 CI
 
 push `build-*` tag 或手动触发 `Build All Platforms`：
 
@@ -185,14 +244,38 @@ git push origin build-1.0.0
 
 ---
 
-## 6. APP 端如何消费
+## 7. APP 端如何消费
 
-APP 下载对应平台 Release 里的各库 tarball：
+### 使用静态库（推荐，尤其 iOS 发布）
+
+从 `release/` 目录获取对应平台的 `include/` + `lib/`：
 
 ```text
-https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/<platform>/<platform>-<lib>.tar.gz
-# 例：https://.../releases/download/windows/windows-ffmpeg.tar.gz
+release/<platform>/<arch>/<lib>/include/   # 头文件
+release/<platform>/<arch>/<lib>/lib/*.a    # 静态库
 ```
 
-解压得该库的 `include/` + `lib/`，加入头文件路径并链接静态库；
-也可把各平台各库合并后直接 vendor 进 APP 工程。
+加入头文件路径并链接静态库。
+
+### 使用动态库
+
+```text
+release/<platform>/<arch>/<lib>/lib/*.so    # Linux/Android
+release/<platform>/<arch>/<lib>/lib/*.dylib # macOS/iOS
+release/<platform>/<arch>/<lib>/lib/*.dll   # Windows
+```
+
+Dart 侧通过 `DynamicLibrary.open()` 加载。
+
+### 也可以把各平台各库合并后直接 vendor 进 APP 工程。
+
+---
+
+## 8. 静态库 vs 动态库选择指南
+
+| 场景 | 推荐使用 | 原因 |
+|------|---------|------|
+| iOS App Store 发布 | 静态库 `.a` | Apple 禁止运行时加载第三方动态库 |
+| Android APP | 动态库 `.so` | Flutter 通过 `DynamicLibrary.open` 加载 |
+| Linux/Windows/macOS 桌面 | 静态库 `.a` | 静态链接进可执行文件，无需分发动态库 |
+| 开发/测试/调试 | 动态库 | 修改后无需重新链接整个程序 |
