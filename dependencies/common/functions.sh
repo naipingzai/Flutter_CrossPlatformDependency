@@ -18,7 +18,11 @@ dl_extract() {
   else
     t="${root}/${tarball}"; p="${root}"
   fi
-  tar -xzf "$t" -C "$p"
+  if [[ "$tarball" == *.tar.xz ]] || [[ "$tarball" == *.txz ]]; then
+    tar -xJf "$t" -C "$p"
+  else
+    tar -xzf "$t" -C "$p"
+  fi
   echo "[${dep}] 就绪: ${root}/${src_dir}"
 }
 
