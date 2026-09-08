@@ -24,7 +24,7 @@ unset CROSS_PREFIX HOST_TRIPLE BUILD_PYTHON 2>/dev/null || true
 
 DEPS_TO_BUILD="${LIBS_LIST:-ffmpeg miniz stb_image sqlite python}"
 for lib in $DEPS_TO_BUILD; do
-  echo "========== 编译 ${lib} (iOS ${arch}) =========="
+  echo "========== 编译 ${lib} (iOS ${ARCH}) =========="
   bash "$(dirname "${BASH_SOURCE[0]}")/../libs/${lib}.sh"
 done
 
