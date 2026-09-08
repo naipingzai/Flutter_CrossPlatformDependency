@@ -85,7 +85,7 @@ build_ffmpeg() {
   local bd="${SRC_ROOT}/ffmpeg/build"; mkdir -p "$bd" && cd "$bd"
   local cfg=()
   # 静态库、裁剪掉命令行工具/文档/调试符号
-  cfg+=(--prefix="$inst"); cfg+=(--enable-static --disable-shared)
+  cfg+=(--prefix="$inst"); cfg+=(--enable-static --enable-shared)
   cfg+=(--disable-programs --disable-doc --disable-debug); cfg+=($DEP_CONFIGURE_FLAGS)
   # 目标架构 / 目标 OS / 交叉编译（android 需要）
   cfg+=(--arch="${ARCH}" --target-os="${target_os}")
@@ -141,6 +141,7 @@ build_miniz() {
   local objs=()
   for s in $DEP_SOURCES; do local o="${bd}/${s%.c}.o"; "${cc}" "${cflags[@]}" -c "${src}/${s}" -o "$o"; objs+=("$o"); done
   ${ar} rcs "$inst/lib/libminiz.a" "${objs[@]}"
+  ${cc} -shared -o "$inst/lib/libminiz.so" "${objs[@]}"
   for h in $DEP_HEADERS; do cp "${src}/${h}" "$inst/include/${h}"; done
   stage_lib miniz
   cp -a "$inst/include" "${STAGE_ROOT}/miniz/${PLATFORM}/${ARCH_DIR}/include"
@@ -164,6 +165,7 @@ build_stb_image() {
   if [ -n "${SYSROOT:-}" ]; then cflags+=("-isysroot" "${SYSROOT}"); fi
   "${cc}" "${cflags[@]}" -c "${bd}/stb_image.c" -o "${bd}/stb_image.o"
   ${ar} rcs "$inst/lib/libstb_image.a" "$bd/stb_image.o"
+  ${cc} -shared -o "$inst/lib/libstb_image.so" "$bd/stb_image.o"
   cp "${src}/stb_image.h" "$inst/include/stb_image.h"
   stage_lib stb_image
   cp -a "$inst/include" "${STAGE_ROOT}/stb_image/${PLATFORM}/${ARCH_DIR}/include"
@@ -186,6 +188,7 @@ build_sqlite() {
   if [ -n "${SYSROOT:-}" ]; then cflags+=("-isysroot" "${SYSROOT}"); fi
   "${cc}" "${cflags[@]}" -c "${src}/sqlite3.c" -o "$bd/sqlite3.o"
   ${ar} rcs "$inst/lib/libsqlite3.a" "$bd/sqlite3.o"
+  ${cc} -shared -o "$inst/lib/libsqlite3.so" "$bd/sqlite3.o"
   cp "${src}/sqlite3.h" "$inst/include/sqlite3.h"; cp "${src}/sqlite3ext.h" "$inst/include/sqlite3ext.h"
   stage_lib sqlite
   cp -a "$inst/include" "${STAGE_ROOT}/sqlite/${PLATFORM}/${ARCH_DIR}/include"

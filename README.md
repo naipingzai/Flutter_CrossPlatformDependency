@@ -1,25 +1,24 @@
 # Flutter_CrossPlatformDependency
 
-> 第三方原生 C/C++ 库的**跨平台静态编译**仓库。
+> 第三方原生 C/C++ 库的**跨平台编译**仓库。同时编译**静态库（.a）**和**动态库（.so/.dylib/.dll）**。
 > 只负责「获取源码 → 编译 → 发布产物」，不参与任何 APP 业务逻辑。
 
 ## 0. 背景：为什么是「静态库」，各平台对原生代码形态的支持
 
-本仓库把第三方库统一编译为**静态库 `.a`**，因为这是唯一能在 5 个平台统一交付
-且被 iOS 强制要求的形式。各平台对原生代码的加载方式差异如下：
+本仓库把第三方库统一编译为**静态库**和**动态库**。各平台产物如下：
 
-| 平台 | 原生代码如何进入 APP | Dart/运行时如何找到它 | 是否需要 PIC | FFmpeg 形态 |
-|------|---------------------|----------------------|:---:|:---:|
-| Linux | 静态链接进**可执行文件** (Flutter runner) | `DynamicLibrary.process()` 查进程符号表 | 否 | 静态 `.a` |
-| Windows | 静态链接进 **.exe** | `DynamicLibrary.process()` | 否 | 静态 `.a` |
-| macOS | 静态链接进**可执行文件** | `DynamicLibrary.process()` | 否 | 静态 `.a` |
-| Android | 打包进共享库壳 **`libfileops.so`** | `DynamicLibrary.open('libfileops.so')` | **是（强制）** | 静态 `.a` |
-| iOS | 静态链接进 **Mach-O** | `DynamicLibrary.process()` | 否 | 静态 `.a` |
+| 平台 | 原生代码加载方式 | 是否需要 PIC | 产物类型 |
+|------|----------------|:---:|:---:|
+| Linux | 静态链接进可执行文件 或 加载 `.so` | 是（.so 必须） | `.a` + `.so` |
+| Windows | 静态链接进 `.exe` 或 加载 `.dll` | 否 | `.a` + `.dll` |
+| macOS | 静态链接进可执行文件 或 加载 `.dylib` | 是（.dylib 必须） | `.a` + `.dylib` |
+| Android | 打包进共享库壳 `.so` 或直接加载 `.so` | **是（强制）** | `.a` + `.so` |
+| iOS | 静态链接进 Mach-O | 否 | `.a`（仅静态） |
 
 ### 关键差异说明
 
 1. **iOS 强制静态库**：App Store 禁止运行时加载第三方动态库，原生代码必须
-   静态链接进最终 Mach-O。→ FFmpeg 只能编 `.a`。
+   静态链接进最终 Mach-O。→ **iOS 仅编译静态库**，其他平台同时编译静态库和动态库。
 2. **Android 的 `.so` 壳 + PIC**：Android 无可执行文件，原生代码必须打包成
    共享库 `libfileops.so`（Dart 通过 `DynamicLibrary.open` 加载）。**共享库在
    ARM64 上强制要求所有代码为位置无关（PIC）**。若静态库缺 `-fPIC`，链接时会报：
@@ -40,7 +39,7 @@
 ## 工程描述
 
 本仓库把 APP 需要的第三方原生库（ffmpeg / miniz / stb_image / sqlite / python）
-在 **5 个目标平台**（linux / windows / macos / android / ios）上编译为**静态库**，
+在 **5 个目标平台**（linux / windows / macos / android / ios）上编译为**静态库和动态库**，
 并发布为按平台区分、按库分开的 GitHub Release 产物（`include/` + `lib/`）。
 
 APP 仓库（如 `Flutter_FileManager`）**不维护第三方库的跨平台编译逻辑**，
@@ -89,11 +88,11 @@ Flutter_CrossPlatformDependency/
 
 | 库 | 构建方式 | 产物 |
 |----|---------|------|
-| ffmpeg | autoconf（按平台 target-os，交叉加 `--enable-cross-compile`） | `libavformat.a` `libavcodec.a` `libavutil.a` `libswscale.a` `libswresample.a` |
-| miniz | 直接编译 amalgamation | `libminiz.a` |
-| stb_image | 直接编译 | `libstb_image.a` |
-| sqlite | 直接编译 sqlite3.c | `libsqlite3.a` |
-| python | linux/macos autoconf（原生，已验证）；windows 官方 embeddable；android 交叉、ios Apple-support（best-effort，交叉编译较难） | `libpython3.12.a` / embeddable / `.xcframework` |
+| ffmpeg | autoconf（`--enable-static --enable-shared`） | 静态：`libavformat.a` `libavcodec.a` ... | 动态：`libavformat.so/.dylib/.dll` ... |
+| miniz | 直接编译 amalgamation（-fPIC） | `libminiz.a` | `libminiz.so/.dylib/.dll` |
+| stb_image | 直接编译（-fPIC） | `libstb_image.a` | `libstb_image.so/.dylib/.dll` |
+| sqlite | 直接编译 sqlite3.c（-fPIC） | `libsqlite3.a` | `libsqlite3.so/.dylib/.dll` |
+| python | linux/macos/windows 原生编译；android 交叉编译；ios best-effort | `libpython3.12.a` / embeddable / `.xcframework` | （python 仅静态） |
 
 > **python**：linux/macos/windows 真实编译；**android/ios 交叉编译 CPython 较难**
 > （configure 无法运行目标二进制），为 best-effort——失败会明确报错并跳过该库，**不影响**
@@ -166,7 +165,7 @@ windows Release:
 macos / android / ios 同理
 ```
 
-每个 `<platform>-<lib>.tar.gz` 解压后为该库的 `include/` + `lib/`。
+每个 `<platform>-<lib>.tar.gz` 解压后为该库的 `include/` + `lib/`（含 `.a` + `.so/.dylib/.dll`，iOS 仅 `.a`）。
 
 架构：linux x86_64 / windows x86_64 / macos arm64 / android arm64-v8a / ios arm64。
 
