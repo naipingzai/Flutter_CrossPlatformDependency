@@ -34,6 +34,10 @@ build_ffmpeg() {
   if [ -n "${CXX:-}" ]; then cfg+=(--cxx="${CXX}"); fi
   if [ -n "${AR:-}" ]; then cfg+=(--ar="${AR}"); fi
   if [ -n "${CROSS_PREFIX:-}" ]; then cfg+=(--cross-prefix="${CROSS_PREFIX}"); fi
+  # Android NDK llvm-ar 同时替代 ar 和 ranlib
+  if [ "$PLATFORM" = "android" ] && [ -n "${AR:-}" ]; then
+    cfg+=(--ranlib="${AR}")
+  fi
   if [ -n "${SYSROOT:-}" ]; then cfg+=(--sysroot="${SYSROOT}"); fi
   if [ -n "${EXTRA_CFLAGS:-}" ]; then cfg+=(--extra-cflags="${EXTRA_CFLAGS}"); fi
   if [ -n "${EXTRA_LDFLAGS:-}" ]; then cfg+=(--extra-ldflags="${EXTRA_LDFLAGS}"); fi
