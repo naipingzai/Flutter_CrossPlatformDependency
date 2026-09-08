@@ -201,33 +201,48 @@ LIBS_LIST="ffmpeg miniz stb_image sqlite python mylib"
 
 ## 5. 产物结构
 
-构建完成后，产物自动输出到 `release/` 目录：
+### 本地构建输出
+
+构建完成后，产物自动输出到 `release/` 目录，按 `库/平台/架构` 组织：
 
 ```text
 release/
-├── linux/x86_64/
-│   ├── ffmpeg/   include/ + lib/ (lib*.a + lib*.so)
-│   ├── miniz/    include/ + lib/
-│   ├── stb_image/ include/ + lib/
-│   ├── sqlite/   include/ + lib/
-│   └── python/   include/ + lib/
-├── windows/x86_64/
-│   ├── ffmpeg/   ...
+├── ffmpeg/
+│   ├── linux/x86_64/    include/ + lib/ (lib*.a + lib*.so)
+│   ├── windows/x86_64/  include/ + lib/
+│   ├── macos/arm64/     include/ + lib/
+│   ├── android/arm64-v8a/ include/ + lib/
+│   └── ios/arm64/       include/ + lib/
+├── miniz/
 │   └── ...
-├── macos/
-│   ├── arm64/    ...
-│   └── x86_64/   ...
-├── android/
-│   ├── armeabi-v7a/ ...
-│   ├── arm64-v8a/   ...
-│   ├── x86/         ...
-│   └── x86_64/      ...
-└── ios/arm64/
-    ├── ffmpeg/   ...
+├── stb_image/
+│   └── ...
+├── sqlite/
+│   └── ...
+└── python/
     └── ...
 ```
 
-每个库目录下包含 `include/`（头文件）和 `lib/`（静态库 + 动态库）。
+每个目录下包含 `include/`（头文件）和 `lib/`（静态库 + 动态库）。
+
+### GitHub Release（CI 自动发布）
+
+CI 构建成功后，发布为**单一 GitHub Release**（tag = `latest`），每个平台每个库独立一个压缩包：
+
+```text
+https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/tag/latest
+
+linux-ffmpeg.tar.gz      windows-ffmpeg.tar.gz    macos-ffmpeg.tar.gz
+android-ffmpeg.tar.gz    ios-ffmpeg.tar.gz
+linux-miniz.tar.gz       windows-miniz.tar.gz     macos-miniz.tar.gz
+android-miniz.tar.gz     ios-miniz.tar.gz
+linux-stb_image.tar.gz   ...
+linux-sqlite.tar.gz
+linux-python.tar.gz
+...
+```
+
+Release 页附带 Markdown 下载表格，行 = 库，列 = 平台，可直接点击下载。
 
 ---
 
@@ -240,32 +255,29 @@ git tag build-1.0.0
 git push origin build-1.0.0
 ```
 
-修改后重新打 tag 到最新 commit 再推送即可触发重建（各平台 Release 会被覆盖更新）。
+修改后重新打 tag 到最新 commit 再推送即可触发重建（`latest` Release 会被覆盖更新）。
 
 ---
 
 ## 7. APP 端如何消费
 
-### 使用静态库（推荐，尤其 iOS 发布）
-
-从 `release/` 目录获取对应平台的 `include/` + `lib/`：
+从 `latest` Release 下载对应平台+库的压缩包：
 
 ```text
-release/<platform>/<arch>/<lib>/include/   # 头文件
-release/<platform>/<arch>/<lib>/lib/*.a    # 静态库
+https://github.com/naipingzai/Flutter_CrossPlatformDependency/releases/download/latest/<platform>-<lib>.tar.gz
+# 例：https://.../releases/download/latest/windows-ffmpeg.tar.gz
+# 例：https://.../releases/download/latest/android-sqlite.tar.gz
 ```
 
-加入头文件路径并链接静态库。
+解压得该库的 `include/` + `lib/`。
+
+### 使用静态库（推荐，尤其 iOS 发布）
+
+加入头文件路径并链接静态库 `.a`。
 
 ### 使用动态库
 
-```text
-release/<platform>/<arch>/<lib>/lib/*.so    # Linux/Android
-release/<platform>/<arch>/<lib>/lib/*.dylib # macOS/iOS
-release/<platform>/<arch>/<lib>/lib/*.dll   # Windows
-```
-
-Dart 侧通过 `DynamicLibrary.open()` 加载。
+Dart 侧通过 `DynamicLibrary.open()` 加载 `.so/.dylib/.dll`。
 
 ### 也可以把各平台各库合并后直接 vendor 进 APP 工程。
 
